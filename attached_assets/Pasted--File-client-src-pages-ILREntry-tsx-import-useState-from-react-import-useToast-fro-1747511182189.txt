@@ -1,0 +1,112 @@
+// File: client/src/pages/ILREntry.tsx
+
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+
+export default function ILREntryPage() {
+  const [form, setForm] = useState({
+    learnerName: "",
+    dateOfBirth: "",
+    uniqueLearnerNumber: "",
+    employerName: "",
+    startDate: "",
+    apprenticeshipStandard: "",
+  });
+  const { toast } = useToast();
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/ilr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!res.ok) throw new Error("Failed to submit ILR");
+
+      toast({ title: "ILR submitted", description: "Learner details saved." });
+      setForm({
+        learnerName: "",
+        dateOfBirth: "",
+        uniqueLearnerNumber: "",
+        employerName: "",
+        startDate: "",
+        apprenticeshipStandard: "",
+      });
+    } catch (error) {
+      console.error("ILR submit error:", error);
+      toast({
+        title: "Error",
+        description: "Submission failed. Please check the data.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <div className="max-w-xl mx-auto p-6 bg-white rounded shadow mt-10">
+      <h1 className="text-2xl font-bold mb-6">ILR Entry Form</h1>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <input
+          name="learnerName"
+          value={form.learnerName}
+          onChange={handleChange}
+          placeholder="Learner Full Name"
+          className="w-full p-2 border rounded"
+          required
+        />
+        <input
+          name="dateOfBirth"
+          type="date"
+          value={form.dateOfBirth}
+          onChange={handleChange}
+          className="w-full p-2 border rounded"
+          required
+        />
+        <input
+          name="uniqueLearnerNumber"
+          value={form.uniqueLearnerNumber}
+          onChange={handleChange}
+          placeholder="ULN (Unique Learner Number)"
+          className="w-full p-2 border rounded"
+          required
+        />
+        <input
+          name="employerName"
+          value={form.employerName}
+          onChange={handleChange}
+          placeholder="Employer Name"
+          className="w-full p-2 border rounded"
+          required
+        />
+        <input
+          name="startDate"
+          type="date"
+          value={form.startDate}
+          onChange={handleChange}
+          className="w-full p-2 border rounded"
+          required
+        />
+        <input
+          name="apprenticeshipStandard"
+          value={form.apprenticeshipStandard}
+          onChange={handleChange}
+          placeholder="Apprenticeship Standard"
+          className="w-full p-2 border rounded"
+          required
+        />
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
+        >
+          Submit ILR
+        </button>
+      </form>
+    </div>
+  );
+}

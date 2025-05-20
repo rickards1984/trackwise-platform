@@ -1,0 +1,95 @@
+❌ Issues & Improvement Suggestions
+1. ❌ API Mismatch: Course Structure Generation
+The UI posts to /api/ai/generate-structure, but your reviewed backend route was:
+
+bash
+Copy
+Edit
+POST /api/course-builder/generate-structure
+✅ Fix the endpoint in handleGenerateStructure:
+
+ts
+Copy
+Edit
+const response = await fetch('/api/course-builder/generate-structure', {
+2. ❗ Missing Standard ID in Course Structure Request
+In your UI request:
+
+ts
+Copy
+Edit
+body: JSON.stringify({ 
+  ksbElements: ksbData,
+  standardTitle: standardInfo?.title,
+  ...
+})
+➡️ But the backend route expects standardId.
+
+✅ Add:
+
+ts
+Copy
+Edit
+standardId: selectedStandard,
+3. ⚠️ KSB ID Extraction Bug
+Your UI tries to extract ids from KSBs but StandardInfo doesn't include them:
+
+ts
+Copy
+Edit
+const ksbIds: number[] = [];
+// But you map .code and .description, not .id
+✅ Fix:
+
+Ensure KSBs returned by /analyze-standard and /apprenticeship-standards/:id include id field.
+
+Else backend recommendation request will fail.
+
+4. 🔁 Repeated Code
+Duplicate logic in handleLoadStandard and handleAnalyzeStandard:
+
+Normalize into loadStandardInfo(data) function
+
+5. 🧱 Component Decomposition (Scalability)
+You’re approaching 1000+ lines in a single component. Suggested refactors:
+
+Component	Suggested File
+KSBSelectionAccordion	components/KSBSelectionAccordion.tsx
+StandardSummaryCard	components/StandardInfoCard.tsx
+ResourcesPanel	components/ResourcesTab.tsx
+ModalViewer	components/KSBDetailModal.tsx
+
+6. 🧠 UX Win: Pre-Select All KSBs
+When user loads a standard, offer a toggle:
+
+"Pre-select all KSBs?" (useful when tutors want full coverage)
+
+ts
+Copy
+Edit
+if (autoSelectAll) {
+  setSelectedKsbs([
+    ...data.knowledge.map(k => k.code),
+    ...data.skills.map(s => s.code),
+    ...data.behaviors.map(b => b.code)
+  ]);
+}
+7. 💾 Auto-Save Draft Support (Stretch)
+Store user’s progress:
+
+LocalStorage OR /api/course-builder/drafts
+
+Resumes where they left off
+
+✅ Final Patch Notes
+md
+Copy
+Edit
+### ✅ Course Builder UI Review Summary
+
+- [ ] FIX endpoint: use `/api/course-builder/generate-structure` not `/ai/generate-structure`
+- [ ] ADD `standardId` to request body when generating course structure
+- [ ] INCLUDE `id` in KSB elements from API for resource recommendation
+- [ ] REFACTOR repetitive `loadStandardInfo()` logic
+- [ ] SUGGEST component breakdown: KSB accordion, resources, modal
+- [ ] UX IDEA: Offer “preselect all KSBs” toggle

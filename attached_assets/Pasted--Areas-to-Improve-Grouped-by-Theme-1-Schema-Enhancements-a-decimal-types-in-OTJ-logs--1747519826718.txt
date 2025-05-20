@@ -1,0 +1,97 @@
+⚠️ Areas to Improve (Grouped by Theme)
+1. 🧱 Schema Enhancements
+a. decimal(...) types in OTJ logs (like totalHours) should specify precision:
+
+ts
+Copy
+Edit
+decimal("total_hours", { precision: 5, scale: 2 })  // Allows 999.99
+b. notes, description fields should have max length enforcement:
+
+Prevent abuse or overflows (esp. from user text inputs)
+
+2. 🧠 Validation and Error Handling
+a. In /weekly/:id/review, catch tutorId === learnerId
+
+ts
+Copy
+Edit
+if (tutorId === weeklyTracking.learnerId) {
+  return res.status(400).json({ message: "Tutor cannot review their own logs" });
+}
+b. In /sign route for reviews:
+
+Validate that the userId making the signature is the same session user, or at least associated.
+
+c. Use Zod refinements or shared enums:
+
+Refactor "learner", "tutor", "employer" roles into an enum and reuse across schema and routes.
+
+3. 🔁 Code Consistency & Style
+a. Use req.session.user?.userId instead of as any or @ts-ignore. Set a proper TS interface for session user:
+
+ts
+Copy
+Edit
+declare module "express-session" {
+  interface SessionData {
+    user: {
+      userId: number;
+      role: string;
+    };
+  }
+}
+b. Ensure all IDs from req.params are parsed consistently:
+
+ts
+Copy
+Edit
+const id = Number(req.params.id);
+if (!Number.isInteger(id)) return res.status(400)...
+c. Stick to async/await everywhere (you do this well!).
+
+4. 📦 Platform Design Considerations
+a. Reusable Enum Types:
+
+otjLogStatusEnum, reviewStatusEnum, activityTypeEnum – move to a single shared enums.ts and use across schema/routes
+
+b. Route Organization:
+Split routes into:
+
+/api/otj/logs
+
+/api/otj/weeks
+
+/api/reviews
+Keeps things logically separate and RESTful
+
+c. Pagination:
+In the admin logs fetch:
+
+ts
+Copy
+Edit
+const page = parseInt(req.query.page as string) || 1;
+✅ Good start, but always cap limit with a max, e.g., Math.min(limit, 100).
+
+🔐 Security/Access Review
+Role	✅ Access
+Learner	Only sees/creates own logs
+Tutor	Views + reviews learners
+IQA	IQA-verifies logs
+Admin	Global access
+✅ This is secure and aligned with funding rules & audit compliance.	
+
+✅ Replit-Friendly Patch Summary
+md
+Copy
+Edit
+### ✅ OTJ & Review System Fixes
+
+- [ ] Add `precision: 5, scale: 2` to `decimal()` fields (hours, totalHours)
+- [ ] Enforce text field limits (e.g. 1000 chars for notes)
+- [ ] Validate tutorId !== learnerId before tutor reviews
+- [ ] Use proper TypeScript `SessionData` typing for `req.session.user`
+- [ ] Use enums for roles and statuses (refactor to `/shared/enums.ts`)
+- [ ] Cap pagination limit: `Math.min(limit, 100)`
+- [ ] Refactor route structure: `/api/otj/logs`, `/weeks`, `/reviews`

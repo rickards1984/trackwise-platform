@@ -1,0 +1,94 @@
+// ✅ Full Review: Reporting & Dashboard Section
+// Part of full-stack apprenticeship platform (client/src/pages/reports.tsx + dashboards)
+
+// ----------------------
+// ✅ Overall Summary
+// ----------------------
+// The reporting infrastructure is well-structured and visually engaging, using Tabs and recharts effectively. 
+// It's a strong foundation for real-time analytics, though most data is still hardcoded and filtering is static.
+
+// ----------------------
+// ✅ Strengths
+// ----------------------
+// 1. ✅ UI/UX
+//   - Dashboard tab layout (OTJ / KSB / Evidence / Activities) is intuitive
+//   - Good use of "Card" design pattern for readability and separation
+//   - Color scheme consistent with branding and accessible
+
+// 2. ✅ Data Visualization
+//   - Great variety: bar, line, pie, progress bar all used effectively
+//   - ResponsiveContainer ensures charts resize correctly
+
+// 3. ✅ Dashboard Grid
+//   - Summary panels ("Total Apprentices", "Completion Rate", etc.) show key metrics clearly
+
+// 4. ✅ Accessibility
+//   - Icons + color used for quick scanning (e.g. Evidence types, Activities)
+
+// ----------------------
+// ❌ Issues & Recommendations
+// ----------------------
+
+// ❌ 1. Data is hardcoded
+//    -> Replace `weeklyOtjData`, `activityTypeData`, `evidenceStatus` etc. with useQuery hook
+//    -> Use server endpoints like:
+//       - /api/reports/otj-hours?range=3months
+//       - /api/reports/evidence-summary
+//    ✅ TIP: Use `enabled: !!user` and `queryKey: ["/api/reports", timeRange]`
+
+// ❌ 2. Time Range Filter is UI-only
+//    - `timeRange` is updated, but not passed to any fetch/query
+//    ✅ Suggest:
+//       - wrap all chart-level useQuery in dependency on `timeRange`
+//       - pass to API as `?range=${timeRange}`
+
+// ❌ 3. Duplicate activityTypeData in evidence tab + activity tab
+//    ✅ Fix: define in one place, or fetch once and memoize for reuse
+
+// ❌ 4. KSB Progress Chart uses static labels (Jan - May)
+//    ✅ Recommend deriving months based on apprentice start date or real data
+
+// ❌ 5. Evidence counts (Approved, Needs Review) are static
+//    ✅ Suggest endpoint like: /api/reports/evidence-status-summary
+
+// ❌ 6. Missing API error/loading states
+//    ✅ Wrap each chart block in conditional:
+//       if (isLoading) return <Spinner />
+//       if (error) return <ErrorAlert />
+
+// ❌ 7. No export handler
+//    ✅ Export button present, but handler is missing
+//    Add:
+//    ```ts
+//    const handleExport = async () => {
+//      const res = await fetch(`/api/reports/export?range=${timeRange}`);
+//      const blob = await res.blob();
+//      downloadBlob(blob, 'report.csv');
+//    }
+//    ```
+
+// ----------------------
+// 🔒 Security / Permissions
+// ----------------------
+// - Reports page assumes `user` context
+// - No conditional rendering by role (learner vs admin vs tutor)
+// ✅ Suggest rendering only relevant tabs:
+//    - Learner: OTJ / Evidence / KSB
+//    - Tutor: Add tabs for cohort comparisons
+//    - Admin: System-wide statistics (active standards, avg OTJ etc.)
+
+// ----------------------
+// 💡 Future Enhancements
+// ----------------------
+// a. Cohort-based benchmarking ("You vs cohort")
+// b. Add CSV export of chart data per tab
+// c. Daily / weekly engagement streaks
+// d. Filter by standard or employer (for IQA / Admin roles)
+// e. Color-blind accessibility pass (replace red/green with texture or icon label)
+
+// ----------------------
+// ✅ Verdict
+// ----------------------
+// ✅ Reporting is well architected and visually clear
+// ❌ Needs data binding, error/loading handling, and filtering logic to be production-ready
+// ➕ Strong candidate for export, benchmarking, cohort analytics going forward

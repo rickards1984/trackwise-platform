@@ -1,0 +1,121 @@
+/* Base Accessibility Themes */
+:root {
+  --transition-speed: 0.3s;
+  --font-size-base: 16px;
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --background-color: #ffffff;
+  --text-color: #000000;
+}
+
+/* Default Theme */
+.theme-default {
+  --background-color: #ffffff;
+  --text-color: #000000;
+}
+
+/* Cream Paper Theme - Easier on the eyes for many people with dyslexia */
+.theme-cream {
+  --background-color: #f8f5e4;
+  --text-color: #333333;
+}
+
+/* Dark Theme - Reduces eye strain in low light */
+.theme-dark {
+  --background-color: #1a1a1a;
+  --text-color: #f5f5f5;
+}
+
+/* Blue Tint - Helps with focus for some neurodivergent users */
+.theme-blue {
+  --background-color: #e8f0fa;
+  --text-color: #333333;
+}
+
+/* Yellow Tint - Commonly recommended for dyslexia */
+.theme-yellow {
+  --background-color: #fafae0;
+  --text-color: #333333;
+}
+
+/* OpenDyslexic Font */
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/woff/OpenDyslexic-Regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/woff/OpenDyslexic-Bold.woff') format('woff');
+  font-weight: bold;
+  font-style: normal;
+}
+
+/* High Contrast Mode */
+.high-contrast {
+  --text-color: #000000;
+  --background-color: #ffffff;
+}
+
+.high-contrast a,
+.high-contrast button,
+.high-contrast .btn,
+.high-contrast .button {
+  border: 3px solid currentColor !important;
+  text-decoration: underline !important;
+}
+
+.high-contrast h1,
+.high-contrast h2,
+.high-contrast h3,
+.high-contrast h4,
+.high-contrast h5,
+.high-contrast h6 {
+  font-weight: 900 !important;
+  letter-spacing: 0.05em;
+}
+
+.high-contrast input,
+.high-contrast textarea,
+.high-contrast select {
+  border: 2px solid #000000 !important;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+.high-contrast img {
+  border: 2px solid #000000;
+}
+
+/* Reduced Motion */
+.reduce-motion * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Line Height Adjustments - Better readability for dyslexia */
+.increased-spacing {
+  line-height: 1.8;
+  letter-spacing: 0.05em;
+  word-spacing: 0.1em;
+}
+
+/* Font Sizes */
+.text-size-large {
+  font-size: 1.2rem;
+}
+
+.text-size-larger {
+  font-size: 1.4rem;
+}
+
+.text-size-largest {
+  font-size: 1.6rem;
+}
+
+/* Focus Indicators for Keyboard Navigation */
+.focus-visible:focus {
+  outline: 3px solid #4d90fe !important;
+  outline-offset: 2px !important;
+}

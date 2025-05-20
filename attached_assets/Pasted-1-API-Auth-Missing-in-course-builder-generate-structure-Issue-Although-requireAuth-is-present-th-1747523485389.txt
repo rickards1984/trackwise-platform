@@ -1,0 +1,82 @@
+1. API Auth Missing in /course-builder/generate-structure
+Issue: Although requireAuth is present, there's no role check (e.g. tutor/admin only).
+
+✅ Add:
+
+ts
+Copy
+Edit
+if (!['admin', 'tutor', 'training_provider'].includes(req.session.user.role)) {
+  return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
+}
+2. Missing Input Validation (Zod)
+Use a zod schema to validate:
+
+ts
+Copy
+Edit
+const schema = z.object({
+  standardId: z.number(),
+  includeResources: z.boolean().optional(),
+  includeAssessments: z.boolean().optional(),
+});
+Then schema.safeParse(req.body) as you've done in OTJ routes.
+
+3. Error Handling on OpenAI Call
+Currently, you parse OpenAI content after .create(), but:
+
+No fallback if completion.choices[0] is undefined
+
+Missing log line for responseContent before parse attempt
+
+✅ Suggestion:
+
+ts
+Copy
+Edit
+const raw = completion.choices?.[0]?.message?.content || '{}';
+console.log("AI Raw Output:", raw);
+4. Prompt Injection Risk (edge case)
+If input.message or standard.description contain suspicious injections (###, "}"), the system may break.
+
+✅ Fix:
+
+Escape newlines in dynamic user strings:
+
+ts
+Copy
+Edit
+const cleanMessage = input.message.replace(/[\r\n]+/g, " ");
+5. Storage Calls Missing Error Guards
+In getPersonalizedSystemPrompt():
+
+If getLearnerProfileByUserId() returns null, code continues
+
+Should add:
+
+ts
+Copy
+Edit
+if (!learnerProfile) systemPrompt += `\n- No learner profile found for this user.`;
+6. Standard Prompt Language (for GPT)
+Some GPT-4o completions fail silently if input prompt is too long or under-specified in JSON generation.
+
+✅ Add safety hint in prompt:
+
+ts
+Copy
+Edit
+Always respond with valid, minified JSON only — no extra explanations.
+✅ Final Patch Notes
+md
+Copy
+Edit
+### ✅ AI Teaching Assistant & Course Builder Review
+
+- [ ] Add role-based access check to `/generate-structure`
+- [ ] Validate `req.body` using Zod (standardId, options)
+- [ ] Add error fallback if `completion.choices[0]` is undefined
+- [ ] Sanitize user messages/descriptions to remove prompt injection edge cases
+- [ ] Log `responseContent` before parsing for better debugging
+- [ ] Add fallback messaging if user or profile data fails to load
+- [ ] Add prompt instruction: “Return only minified JSON object”

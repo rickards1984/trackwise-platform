@@ -1,0 +1,132 @@
+✅ What Works Well
+Area	Highlights
+🔐 Auth & RBAC	Learners-only creation enforced (req.session.role === "learner")
+🧾 Validation	Uses Zod schema validation for strict field controls
+🧱 Data model	Status (draft, submitted, approved, etc.) allows multi-role workflows
+📎 File Storage	Uses Date.now() for unique naming and dynamic /uploads/ directory creation
+💡 Preview UX	Reads file via FileReader and renders preview immediately
+🔄 Dual-mode input	Form handles multipart/form-data and plain JSON
+
+❌ Areas Needing Fixes or Enhancements
+1. ❗ Missing File Object Extraction (file.name is undefined)
+You reference:
+
+ts
+Copy
+Edit
+const fileName = `${Date.now()}-${file.name}`;
+await file.mv(uploadPath);
+But no line defines file. This is likely meant to be:
+
+ts
+Copy
+Edit
+const file = req.files?.file;
+✅ Fix:
+Ensure file is pulled safely:
+
+ts
+Copy
+Edit
+const file = req.files?.file;
+if (!file) return res.status(400).json({ message: "File missing" });
+2. ❗ File Upload Middleware Assumed But Missing
+You're using file.mv(...) — that’s from express-fileupload, not multer.
+
+✅ Fix:
+
+Ensure express-fileupload is initialized in your app:
+
+ts
+Copy
+Edit
+import fileUpload from 'express-fileupload';
+app.use(fileUpload());
+🔁 Alternatively, switch to multer for better security and file type validation.
+
+3. ❗ PATCH Endpoint Incomplete
+This is present:
+
+ts
+Copy
+Edit
+// Permission checking based on roles
+// Different update rules for learners vs. assessors/IQAs
+But there's no actual implementation.
+
+✅ Add logic like:
+
+ts
+Copy
+Edit
+if (req.session.role === 'learner' && evidence.status === 'approved') {
+  return res.status(403).json({ message: "Learners cannot update approved evidence" });
+}
+
+if (req.session.role === 'learner' && evidence.learnerId !== req.session.userId) {
+  return res.status(403).json({ message: "You can only update your own evidence" });
+}
+And finally:
+
+ts
+Copy
+Edit
+const updatedEvidence = await storage.updateEvidenceItem(evidenceId, patchData);
+4. ⚠️ Evidence Metadata Not Stored
+Files should save:
+
+originalName
+
+mimetype
+
+size
+
+✅ Append to DB (if not already):
+
+ts
+Copy
+Edit
+evidenceData.originalFilename = file.name;
+evidenceData.mimetype = file.mimetype;
+evidenceData.filesize = file.size;
+5. 🔁 File Cleanup Strategy (Long-Term)
+Currently, there's no cleanup policy for unused or orphaned files.
+
+✅ Plan:
+
+Delete previous file if user updates evidence file
+
+Run scheduled cleanup for old drafts
+
+6. 🧠 Reflection Field Use
+The reflection field is excellent for learner journaling.
+
+✅ Bonus UX:
+
+Markdown preview toggle for learners
+
+Highlight minimum word count before submission
+
+✅ Replit Patch Summary
+md
+Copy
+Edit
+### ✅ Evidence Upload & Update Review
+
+- [ ] FIX: `file.name` used before `file` is declared — define: `const file = req.files?.file`
+- [ ] ADD: `express-fileupload` middleware setup (`app.use(fileUpload())`)
+- [ ] COMPLETE: PATCH `/api/evidence/:id` endpoint:
+  - [ ] Block learner updates to approved evidence
+  - [ ] Ensure only the original learner can edit
+  - [ ] Call `storage.updateEvidenceItem(...)`
+- [ ] STORE: `originalFilename`, `mimetype`, `filesize` from uploaded file
+- [ ] PLAN: Orphan file cleanup & file replacement strategy
+🧱 Optional Enhancements
+🔐 Add virus scan middleware (e.g., ClamAV, or scan via API)
+
+☁️ Connect to S3/Cloudinary instead of local /uploads/
+
+📊 Add evidence tagging by OTJ/Standard/Module
+
+🧾 Add download counter per file (for audit)
+

@@ -1,0 +1,109 @@
+✅ What’s Strong & Correct
+Area	Implementation
+🧠 RBAC	canAccessLearnerProfile() is strict and clear — guards access by user role + association
+📑 Form Validation	zod schema in sync with UI inputs; password match logic is clean (refine)
+📦 State + Data	react-query with invalidation post-mutation ensures UI freshness
+📊 Learner Progress	Admin view with learner progress bars shows thoughtful design
+🧪 ULN Input	Great UX — regex validation + visual feedback + instruction text
+📅 Apprenticeship Info	Shows core ILR fields: start/end date, hours, program, provider name
+♻️ Responsive Layout	grid layout ensures responsive structure (cards, tabs)
+🛡️ Update Restrictions	Mutations scoped to authenticated user ID — cannot spoof PATCH ID
+
+❌ Issues & Fixes
+1. ❗ Email & Username Editable but Not Protected in UI
+You're rendering inputs for:
+
+tsx
+Copy
+Edit
+<FormField name="email" />
+<FormField name="username" />
+✅ Either:
+
+Disable them in the UI
+
+Or build PATCH /users/:id logic to restrict which roles can update email or username
+
+📌 Recommended: Email/username updates should be separate, with re-verification flow.
+
+2. ❗ minimumOtjHours / 52 Assumes Fixed Weekly Distribution
+tsx
+Copy
+Edit
+{profile.standard?.minimumOtjHours / 52}
+✅ Safer to round to 2 decimal places and explain:
+
+tsx
+Copy
+Edit
+{(profile.standard?.minimumOtjHours / 52).toFixed(2)} hours/week
+Or, compute actual weeks between startDate and expectedEndDate.
+
+3. ⚠️ getFormattedDate May Fail if Null
+ts
+Copy
+Edit
+getFormattedDate(profile.startDate)
+✅ Wrap in fallback guard:
+
+ts
+Copy
+Edit
+profile?.startDate ? getFormattedDate(profile.startDate) : "N/A"
+4. ❗ No Profile Edit Permissions Check in Backend
+You have frontend form to PATCH /users/:id — but backend must verify:
+
+Learner can only edit their own profile
+
+Only admin/operations can edit any
+
+✅ Backend route should check:
+
+ts
+Copy
+Edit
+if (req.session.role !== 'admin' && req.session.userId !== targetUserId) {
+  return res.status(403).json({ message: "You can only edit your own profile" });
+}
+5. 🧠 Password Change Form Not Fully Reviewed Here
+✅ Ensure currentPassword is verified before allowing a change.
+
+✅ Suggest separate endpoint:
+
+ts
+Copy
+Edit
+PATCH /users/:id/password
+6. 💡 Tutor/IQA/Provider Association in UI
+You're enforcing tutor/IQA association in middleware, but learners can’t see who their tutor/IQA is.
+
+✅ Display:
+
+tsx
+Copy
+Edit
+<p>Your tutor: {profile.tutor?.name}</p>
+<p>Your IQA: {profile.iqa?.name}</p>
+This helps build trust + transparency.
+
+✅ Summary Patch Notes for Replit
+md
+Copy
+Edit
+### ✅ Learner Profile Review Summary
+
+- [ ] BLOCK: Learner profile PATCH must verify user matches `req.session.userId`
+- [ ] FIX: Disable or restrict email/username editing (or move to verified update flow)
+- [ ] ENHANCE: Round `minimumOtjHours / 52` to 2 decimals or base on actual weeks
+- [ ] GUARD: Wrap `getFormattedDate(...)` with null checks
+- [ ] ADD: Display tutor/IQA name in learner apprenticeship details
+- [ ] SEPARATE: Password update into its own endpoint for clarity
+🔐 Security & RBAC Consistency Check
+Role	Can View	Can Edit
+Learner	Their own	Their own (partial)
+Tutor / IQA	Only their learners	No direct editing
+Admin	All learners	Full control
+Training Provider	Their assigned learners	Possibly some fields (TBD)
+
+✅ Enforced ✅ Mostly Enforced ⚠️ Needs Backend Guard
+
