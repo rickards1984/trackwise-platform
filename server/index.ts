@@ -76,10 +76,18 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
+   // Serve frontend from client/dist
+  app.use(express.static(path.join(__dirname, "../client/dist")));
+
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  });
+
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
+
   server.listen({
     port,
     host: "0.0.0.0",
@@ -87,4 +95,3 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
-})();
