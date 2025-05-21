@@ -1,0 +1,16 @@
+# Ignore backend code for Vercel deploy
+server/
+db/
+drizzle/
+migrations/
+scripts/
+types/
+.env
+.eslintrc.cjs
+vite.config.server.ts
+tsconfig.server.json
+tsconfig.json
+.vscode/
+README.md
+package.json
+tsup.config.ts
