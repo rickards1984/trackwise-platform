@@ -9,7 +9,7 @@ import { User, getCurrentUser } from "./lib/auth";
 // Regular imports for frequently used pages
 import Login from "@/pages/auth/login";
 import MockLogin from "@/pages/auth/mock-login";
-import Register from "@/pages/auth/register";
+import Signup from "./pages/auth/signup";
 import VerificationSuccess from "@/pages/auth/verification-success";
 import VerificationSent from "@/pages/auth/verification-sent";
 import VerificationError from "@/pages/auth/verification-error";
@@ -122,7 +122,10 @@ function Router() {
       {/* Public routes */}
       <Route path="/login" component={Login} />
       <Route path="/test-login" component={MockLogin} />
-      <Route path="/register" component={Register} />
+      <Route path="/signup" component={Signup} />
+      <Route path="/signup-test">
+  <div style={{ padding: "2rem", fontSize: "1.5rem" }}>✅ Test route is working</div>
+</Route>
       <Route path="/auth/verification-sent" component={VerificationSent} />
       <Route path="/auth/verify-email" component={VerificationSuccess} />
       <Route path="/verification-success" component={VerificationSuccess} />
