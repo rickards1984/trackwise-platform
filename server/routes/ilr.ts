@@ -229,8 +229,7 @@ ilrRouter.post("/upload",
       // 4. Create a record of the upload
 
       // For now, we'll just log the upload and return success
-      console.log(`ILR file uploaded: ${req.file.originalname}`);
-      console.log(`Path: ${req.file.path}`);
+      console.log("ILR file uploaded successfully");
       console.log(`Academic Year: ${academicYear}, Return Period: ${returnPeriod}`);
       
       // Return success
@@ -462,178 +461,101 @@ ilrRouter.get("/learners", requireAuth, async (req, res) => {
 });
 
 // Generate and export ILR data as XML
-ilrRouter.get("/export", 
-  requireAuth,
-  async (req, res) => {
+ilrRouter.get("/export", requireAuth, async (req, res) => {
+  try {
+    // Get query parameters
+    const { academicYear, returnPeriod } = req.query;
+    
+    if (!academicYear || !returnPeriod) {
+      return res.status(400).json({ 
+        error: "Missing required parameters", 
+        message: "Academic year and return period are required" 
+      });
+    }
+    
+    // Get the current date for file preparation date
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    // Get provider settings from the database - including UKPRN
+    let ukprn = "10004300"; // Default value as fallback
+    
     try {
-      // Get query parameters
-      const { academicYear, returnPeriod } = req.query;
-      
-      if (!academicYear || !returnPeriod) {
-        return res.status(400).json({ 
-          error: "Missing required parameters", 
-          message: "Academic year and return period are required" 
-        });
+      const providerSettings = await storage.getProviderSettings();
+      if (providerSettings && providerSettings.providerName) {
+        console.log("Retrieved provider settings:", providerSettings.providerName);
       }
-      
-      // Get the current date for file preparation date
-      const currentDate = new Date().toISOString().split('T')[0];
-      
-      // Get provider settings from the database - including UKPRN
-      // In a real implementation, this would come from the provider's profile
-      let ukprn = "10004300"; // Default value as fallback
-      try {
-        // Get provider settings from the database
-        const providerSettings = await storage.getProviderSettings();
-        
-        // Check if we have a UKPRN in provider settings
-        if (providerSettings && providerSettings.providerName) {
-          // In a real implementation, this would be:
-          // ukprn = providerSettings.ukprn;
-          
-          // For now, we'll use our test UKPRN since our schema might not have this field yet
-          console.log("Retrieved provider settings:", providerSettings.providerName);
-        }
-      } catch (error) {
-        console.error("Error fetching provider settings:", error);
-        console.warn("Using fallback UKPRN as provider settings could not be retrieved");
-      }
-      
-      // Fetch learners from database for the specified academic year and return period
-      let learners = [];
-      try {
-        // In a real implementation, this would be:
-        // const learners = await storage.getIlrLearners(academicYear, returnPeriod);
-        
-        // Since we need to demonstrate the functionality, let's use our sample learners
-        // but in a production environment this would be fetched from the database
-        learners = [
+    } catch (error) {
+      console.error("Error fetching provider settings");
+      console.warn("Using fallback UKPRN as provider settings could not be retrieved");
+    }
+    
+    // Fetch learners - in production we would use real DB data
+    let learners = [
+      {
+        id: 1,
+        learnRefNumber: "LRN0001",
+        uln: "1234567890",
+        familyName: "Smith",
+        givenNames: "John",
+        dateOfBirth: "1996-05-15",
+        ethnicity: "31",
+        sex: "M",
+        llddHealthProb: "2",
+        postcodePrior: "AB12 3CD",
+        postcode: "AB12 3CD",
+        learningDeliveries: [
           {
-            id: 1,
-            learnRefNumber: "LRN0001",
-            uln: "1234567890",
-            familyName: "Smith",
-            givenNames: "John",
-            dateOfBirth: "1996-05-15",
-            ethnicity: "31",
-            sex: "M",
-            llddHealthProb: "2",
-            postcodePrior: "AB12 3CD",
-            postcode: "AB12 3CD",
-            learningDeliveries: [
+            learnAimRef: "ZPROG001",
+            aimType: "1",
+            aimSeqNumber: "1",
+            learnStartDate: "2024-09-01",
+            learnPlanEndDate: "2026-08-31",
+            fundModel: "36",
+            pHours: "0",
+            compStatus: "1",
+            appFinRecords: [
               {
-                learnAimRef: "ZPROG001",
-                aimType: "1",
-                aimSeqNumber: "1",
-                learnStartDate: "2024-09-01",
-                learnPlanEndDate: "2026-08-31",
-                fundModel: "36",
-                pHours: "0",
-                compStatus: "1",
-                appFinRecords: [
-                  {
-                    aFinType: "TNP",
-                    aFinCode: "1",
-                    aFinDate: "2024-09-01",
-                    aFinAmount: "12000"
-                  }
-                ],
-                learningDeliveryFAMs: [
-                  {
-                    learnDelFAMType: "ACT",
-                    learnDelFAMCode: "1"
-                  },
-                  {
-                    learnDelFAMType: "LDM",
-                    learnDelFAMCode: "357"
-                  }
-                ]
+                aFinType: "TNP",
+                aFinCode: "1",
+                aFinDate: "2024-09-01",
+                aFinAmount: "12000"
               }
             ],
-            contactPreferences: [
+            learningDeliveryFAMs: [
               {
-                contPrefType: "RUI",
-                contPrefCode: "1"
-              }
-            ],
-            learnerEmploymentStatuses: [
+                learnDelFAMType: "ACT",
+                learnDelFAMCode: "1"
+              },
               {
-                empStat: "10",
-                dateEmpStatApp: "2024-09-01",
-                employer: {
-                  empId: "12345678"
-                }
-              }
-            ]
-          },
-          {
-            id: 2,
-            learnRefNumber: "LRN0002",
-            uln: "2345678901",
-            familyName: "Johnson",
-            givenNames: "Sarah",
-            dateOfBirth: "1998-11-22",
-            ethnicity: "31",
-            sex: "F",
-            llddHealthProb: "2",
-            postcodePrior: "CD34 5EF",
-            postcode: "CD34 5EF",
-            learningDeliveries: [
-              {
-                learnAimRef: "ZPROG001",
-                aimType: "1",
-                aimSeqNumber: "1",
-                learnStartDate: "2024-09-01",
-                learnPlanEndDate: "2026-08-31",
-                fundModel: "36",
-                pHours: "0",
-                compStatus: "1",
-                appFinRecords: [
-                  {
-                    aFinType: "TNP",
-                    aFinCode: "1",
-                    aFinDate: "2024-09-01",
-                    aFinAmount: "12000"
-                  }
-                ],
-                learningDeliveryFAMs: [
-                  {
-                    learnDelFAMType: "ACT",
-                    learnDelFAMCode: "1"
-                  },
-                  {
-                    learnDelFAMType: "LDM",
-                    learnDelFAMCode: "357"
-                  }
-                ]
-              }
-            ],
-            contactPreferences: [
-              {
-                contPrefType: "RUI",
-                contPrefCode: "1"
-              }
-            ],
-            learnerEmploymentStatuses: [
-              {
-                empStat: "10",
-                dateEmpStatApp: "2024-09-01",
-                employer: {
-                  empId: "98765432"
-                }
+                learnDelFAMType: "LDM",
+                learnDelFAMCode: "357"
               }
             ]
           }
-        ];
-        
-        console.log(`Fetched ${learners.length} learners for ILR export`);
-      } catch (error) {
-        console.error("Error fetching learners for ILR export:", error);
-        return res.status(500).json({ error: "Failed to fetch learner data for ILR export" });
+        ],
+        contactPreferences: [
+          {
+            contPrefType: "RUI",
+            contPrefCode: "1"
+          }
+        ],
+        learnerEmploymentStatuses: [
+          {
+            empStat: "10",
+            dateEmpStatApp: "2024-09-01",
+            employer: {
+              empId: "98765432"
+            }
+          }
+        ]
       }
-      
-      // Build XML content with proper structure according to ESFA ILR schema
-      let xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+    ];
+    
+    // Log the number of learners for security auditing
+    console.log(`Exporting ILR data for ${learners.length} learners`);
+    
+    // Build XML content with proper structure according to ESFA ILR schema
+    let xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <Message xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="ESFA/ILR/2024-25">
   <Header>
     <CollectionDetails>
@@ -644,18 +566,15 @@ ilrRouter.get("/export",
     <Source>
       <ProtectiveMarking>OFFICIAL-SENSITIVE-Personal</ProtectiveMarking>
       <UKPRN>${ukprn}</UKPRN>
-      <SoftwareSupplier>ApprenticeshipManager</SoftwareSupplier>
-      <SoftwarePackage>ApprenticeshipManager ILR Module</SoftwarePackage>
+      <SoftwareSupplier>Apprenticeship Platform</SoftwareSupplier>
+      <SoftwarePackage>AP ILR Generator</SoftwarePackage>
       <Release>1.0</Release>
     </Source>
-  </Header>
-  <LearningProvider>
-    <UKPRN>${ukprn}</UKPRN>
-  </LearningProvider>`;
-      
-      // Add each learner to the XML with full details
-      for (const learner of learners) {
-        xmlContent += `
+  </Header>`;
+    
+    // Add learners to XML
+    for (const learner of learners) {
+      xmlContent += `
   <Learner>
     <LearnRefNumber>${learner.learnRefNumber}</LearnRefNumber>
     <ULN>${learner.uln}</ULN>
@@ -667,40 +586,40 @@ ilrRouter.get("/export",
     <LLDDHealthProb>${learner.llddHealthProb}</LLDDHealthProb>
     <PostcodePrior>${learner.postcodePrior}</PostcodePrior>
     <Postcode>${learner.postcode}</Postcode>`;
-        
-        // Add Contact Preferences if available
-        if (learner.contactPreferences && learner.contactPreferences.length > 0) {
-          for (const contactPref of learner.contactPreferences) {
-            xmlContent += `
+      
+      // Add contact preferences if available
+      if (learner.contactPreferences && learner.contactPreferences.length > 0) {
+        for (const pref of learner.contactPreferences) {
+          xmlContent += `
     <ContactPreference>
-      <ContPrefType>${contactPref.contPrefType}</ContPrefType>
-      <ContPrefCode>${contactPref.contPrefCode}</ContPrefCode>
+      <ContPrefType>${pref.contPrefType}</ContPrefType>
+      <ContPrefCode>${pref.contPrefCode}</ContPrefCode>
     </ContactPreference>`;
-          }
         }
-        
-        // Add Learner Employment Status if available
-        if (learner.learnerEmploymentStatuses && learner.learnerEmploymentStatuses.length > 0) {
-          for (const empStatus of learner.learnerEmploymentStatuses) {
-            xmlContent += `
+      }
+      
+      // Add learner employment statuses if available
+      if (learner.learnerEmploymentStatuses && learner.learnerEmploymentStatuses.length > 0) {
+        for (const empStatus of learner.learnerEmploymentStatuses) {
+          xmlContent += `
     <LearnerEmploymentStatus>
       <EmpStat>${empStatus.empStat}</EmpStat>
       <DateEmpStatApp>${empStatus.dateEmpStatApp}</DateEmpStatApp>`;
-            
-            if (empStatus.employer && empStatus.employer.empId) {
-              xmlContent += `
+          
+          if (empStatus.employer && empStatus.employer.empId) {
+            xmlContent += `
       <EmpId>${empStatus.employer.empId}</EmpId>`;
-            }
-            
-            xmlContent += `
-    </LearnerEmploymentStatus>`;
           }
+          
+          xmlContent += `
+    </LearnerEmploymentStatus>`;
         }
-        
-        // Add Learning Deliveries
-        if (learner.learningDeliveries && learner.learningDeliveries.length > 0) {
-          for (const delivery of learner.learningDeliveries) {
-            xmlContent += `
+      }
+      
+      // Add learning deliveries if available
+      if (learner.learningDeliveries && learner.learningDeliveries.length > 0) {
+        for (const delivery of learner.learningDeliveries) {
+          xmlContent += `
     <LearningDelivery>
       <LearnAimRef>${delivery.learnAimRef}</LearnAimRef>
       <AimType>${delivery.aimType}</AimType>
@@ -710,59 +629,58 @@ ilrRouter.get("/export",
       <FundModel>${delivery.fundModel}</FundModel>
       <PHours>${delivery.pHours}</PHours>
       <CompStatus>${delivery.compStatus}</CompStatus>`;
-            
-            // Add Learning Delivery FAMs if available
-            if (delivery.learningDeliveryFAMs && delivery.learningDeliveryFAMs.length > 0) {
-              for (const fam of delivery.learningDeliveryFAMs) {
-                xmlContent += `
+          
+          // Add FAMs if available
+          if (delivery.learningDeliveryFAMs && delivery.learningDeliveryFAMs.length > 0) {
+            for (const fam of delivery.learningDeliveryFAMs) {
+              xmlContent += `
       <LearningDeliveryFAM>
         <LearnDelFAMType>${fam.learnDelFAMType}</LearnDelFAMType>
         <LearnDelFAMCode>${fam.learnDelFAMCode}</LearnDelFAMCode>
       </LearningDeliveryFAM>`;
-              }
             }
-            
-            // Add Apprenticeship Financial Records if available
-            if (delivery.appFinRecords && delivery.appFinRecords.length > 0) {
-              for (const finRecord of delivery.appFinRecords) {
-                xmlContent += `
+          }
+          
+          // Add Apprenticeship Financial Records if available
+          if (delivery.appFinRecords && delivery.appFinRecords.length > 0) {
+            for (const finRecord of delivery.appFinRecords) {
+              xmlContent += `
       <AppFinRecord>
         <AFinType>${finRecord.aFinType}</AFinType>
         <AFinCode>${finRecord.aFinCode}</AFinCode>
         <AFinDate>${finRecord.aFinDate}</AFinDate>
         <AFinAmount>${finRecord.aFinAmount}</AFinAmount>
       </AppFinRecord>`;
-              }
             }
-            
-            xmlContent += `
-    </LearningDelivery>`;
           }
+          
+          xmlContent += `
+    </LearningDelivery>`;
         }
-        
-        xmlContent += `
-  </Learner>`;
       }
       
-      // Close the root element
       xmlContent += `
-</Message>`;
-      
-      // Set proper headers for XML download
-      res.setHeader('Content-Type', 'application/xml');
-      res.setHeader('Content-Disposition', `attachment; filename="ILR-${ukprn}-R${returnPeriod}-${academicYear}.xml"`);
-      
-      // Send the XML file
-      res.send(xmlContent);
-      
-      // Log the export
-      console.log(`ILR data exported for ${academicYear}, return period ${returnPeriod} by ${req.session?.userId}`);
-      
-    } catch (error) {
-      console.error("Error exporting ILR data:", error);
-      res.status(500).json({ error: "Failed to export ILR data" });
+  </Learner>`;
     }
+    
+    // Close the root element
+    xmlContent += `
+</Message>`;
+    
+    // Set proper headers for XML download
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Content-Disposition', `attachment; filename="ILR-${ukprn}-R${returnPeriod}-${academicYear}.xml"`);
+    
+    // Send the XML file
+    res.send(xmlContent);
+    
+    // Log the export with minimal info for security
+    console.log(`ILR data exported for ${academicYear}, return period ${returnPeriod}`);
+    
+  } catch (error) {
+    console.error("Error exporting ILR data");
+    res.status(500).json({ error: "Failed to export ILR data" });
   }
-);
+});
 
 export default ilrRouter;

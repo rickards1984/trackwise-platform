@@ -1,6 +1,7 @@
-import { pgTable, text, serial, integer, boolean, date, timestamp, pgEnum, varchar, jsonb, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, date, timestamp, pgEnum, varchar, jsonb, decimal, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 
 // Enum for user roles
 export const userRoleEnum = pgEnum('user_role', ['admin', 'training_provider', 'assessor', 'iqa', 'learner', 'operations']);
@@ -39,6 +40,10 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow(),
   lastLoginAt: timestamp("last_login_at"),
+  gdprConsentGiven: boolean("gdpr_consent_given").default(false),
+  gdprConsentDate: timestamp("gdpr_consent_date"),
+  dataRetentionAccepted: boolean("data_retention_accepted").default(false),
+  marketingOptIn: boolean("marketing_opt_in").default(false),
 });
 
 // Email verification table
@@ -120,7 +125,7 @@ export const otjLogEntries = pgTable("otj_log_entries", {
   date: date("date").notNull(),
   hours: decimal("hours", { precision: 5, scale: 2 }).notNull(), // Store hours with precision (999.99)
   activityType: text("activity_type").notNull(),
-  description: text("description").notNull().$type<string>(1000), // Limit description to 1000 chars
+  description: text("description").notNull(), // Description field
   category: otjCategoryEnum("category").notNull(),
   ksbId: integer("ksb_id"), // Foreign key to ksb elements, optional
   evidenceId: integer("evidence_id"), // Foreign key to evidence items, optional
@@ -164,7 +169,7 @@ export const learningGoals = pgTable("learning_goals", {
   targetDate: date("target_date").notNull(),
   status: text("status").notNull().default('active'), // 'active', 'completed', 'overdue'
   completionDate: date("completion_date"),
-  ksbIds: text("ksb_ids").array(), // Array of KSB element IDs this goal is related to
+  ksbIds: integer("ksb_ids").array(), // Array of KSB element IDs this goal is related to
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -201,7 +206,7 @@ export const learningResources = pgTable("learning_resources", {
   thumbnailUrl: text("thumbnail_url"),
   tags: text("tags").array(),
   standardId: integer("standard_id"), // Related apprenticeship standard (optional)
-  ksbIds: text("ksb_ids").array(), // Array of KSB element IDs this resource helps with
+  ksbIds: integer("ksb_ids").array(), // Array of KSB element IDs this resource helps with
   createdById: integer("created_by_id").notNull(), // User who added this resource
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -301,6 +306,17 @@ export const ilrValidationResults = pgTable("ilr_validation_results", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Session storage table for authentication
+export const sessions = pgTable("sessions", {
+  sid: varchar("sid").primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+}, (table) => {
+  return {
+    expireIdx: index("session_expire_idx").on(table.expire)
+  };
+});
+
 // Weekly OTJ Hours Tracking
 export const weeklyOtjTracking = pgTable("weekly_otj_tracking", {
   id: serial("id").primaryKey(),
@@ -352,10 +368,34 @@ export const twelveWeeklyReviews = pgTable("twelve_weekly_reviews", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Helper to create Zod schema from PG enum values
+export function createZodEnumFromPgEnum(pgEnum: { enumValues: string[] }) {
+  if (pgEnum.enumValues.length === 0) {
+    throw new Error('Enum must have at least one value');
+  }
+  
+  // Create a properly typed tuple with at least one value
+  const [first, ...rest] = pgEnum.enumValues;
+  return z.enum([first, ...rest]);
+}
+
+// Zod schemas for all the enums
+export const userRoleSchema = createZodEnumFromPgEnum(userRoleEnum);
+export const userStatusSchema = createZodEnumFromPgEnum(userStatusEnum);
+export const evidenceStatusSchema = createZodEnumFromPgEnum(evidenceStatusEnum);
+export const otjLogStatusSchema = createZodEnumFromPgEnum(otjLogStatusEnum);
+export const ilrUploadStatusSchema = createZodEnumFromPgEnum(ilrUploadStatusEnum);
+export const otjCategorySchema = createZodEnumFromPgEnum(otjCategoryEnum);
+export const weeklyTrackingStatusSchema = createZodEnumFromPgEnum(weeklyTrackingStatusEnum);
+export const evidenceTypeSchema = createZodEnumFromPgEnum(evidenceTypeEnum);
+export const reviewStatusSchema = createZodEnumFromPgEnum(reviewStatusEnum);
+
 // Create insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
+export const insertUserSchema = createInsertSchema(users, {
+  role: userRoleSchema,
+  status: userStatusSchema
+}).omit({
   id: true,
-  status: true,
   createdAt: true,
   lastLoginAt: true,
 });

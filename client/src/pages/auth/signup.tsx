@@ -2,7 +2,7 @@
 console.log("✅ Signup component loaded");
 import { useState } from 'react';
 import { supabase } from "../../lib/supabase";
-import { useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { Container } from '@chakra-ui/react';
 import { Heading } from '@chakra-ui/react';
 import { Input } from '@chakra-ui/react';
@@ -20,7 +20,8 @@ const Signup = () => {
   const [role, setRole] = useState('Apprentice');
   const [loading, setLoading] = useState(false);
   const toast = useToast();
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
+navigate("/dashboard");
 
   const handleSignup = async () => {
     setLoading(true);

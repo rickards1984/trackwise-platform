@@ -127,7 +127,21 @@ router.post('/:id/sign', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Invalid review ID' });
     }
 
-    const { role, userId } = req.body;
+    // Validate input with Zod
+    const signReviewSchema = z.object({
+      role: z.enum(['learner', 'employer', 'tutor', 'admin', 'iqa']),
+      userId: z.number().int().positive()
+    });
+
+    const validationResult = signReviewSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        message: 'Invalid signature data', 
+        errors: validationResult.error.errors 
+      });
+    }
+
+    const { role, userId } = validationResult.data;
     
     // Get the current session user
     const sessionData = req.session as any;
@@ -141,8 +155,8 @@ router.post('/:id/sign', async (req: Request, res: Response) => {
     }
 
     // Validate role using the enum from shared/enums.ts
-    if (!['learner', 'employer', 'tutor'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role. Must be learner, employer, or tutor' });
+    if (!['learner', 'employer', 'tutor', 'admin', 'iqa'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role. Must be learner, employer, tutor, admin, or iqa' });
     }
 
     // Validate userId
@@ -175,6 +189,7 @@ router.post('/:id/sign', async (req: Request, res: Response) => {
       });
     }
 
+    // Admin/IQA special handling now handled in the storage implementation
     const signedReview = await storage.signTwelveWeeklyReview(id, role, userId);
     if (!signedReview) {
       return res.status(500).json({ message: 'Failed to sign review' });

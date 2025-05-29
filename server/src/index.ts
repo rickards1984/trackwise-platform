@@ -4,33 +4,42 @@ import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
 import fileUpload from "express-fileupload";
 import path from "path";
-import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 
 const app = express();
-// Must be set before rate limiters!
-app.set('trust proxy', 1);
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(fileUpload({
   createParentPath: true,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max file size
+  limits: { fileSize: 50 * 1024 * 1024 },
   abortOnLimit: true,
   responseOnLimit: "File size limit has been reached (50MB)"
 }));
 
-// Serve uploaded files from the project root
 app.use('/uploads', express.static('uploads'));
 
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  // Security-enhanced logging without capturing sensitive response data
+  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+
+  const originalResJson = res.json;
+  res.json = function (bodyJson, ...args) {
+    capturedJsonResponse = bodyJson;
+    return originalResJson.apply(res, [bodyJson, ...args]);
+  };
+
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      // Only log the method, path, status code and duration without sensitive response data
-      const logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      if (capturedJsonResponse) {
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      }
+
+      if (logLine.length > 80) {
+        logLine = logLine.slice(0, 79) + "…";
+      }
+
       log(logLine);
     }
   });
@@ -39,7 +48,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Seed the database with initial data
   try {
     await seedDatabase();
     log('Database seeding completed');
@@ -47,35 +55,27 @@ app.use((req, res, next) => {
     log('Error seeding database:', error);
   }
 
-  // Register main routes
   const server = await registerRoutes(app);
-  
-  // Register report routes
-  try {
-    const { registerReportsRoutes } = await import('./routes/reports');
-    registerReportsRoutes(app);
-  } catch (error) {
-    log('Error registering report routes:', error);
-  }
 
-  // Use the 404 handler for unmatched routes after all API routes
-  app.use('/api/*', notFoundHandler);
-  
-  // Use the global error handler
-  app.use(errorHandler);
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    res.status(status).json({ message });
+    throw err;
+  });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  app.use(express.static(path.join(__dirname, "../client/dist")));
+
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  });
+
   const port = 5000;
   server.listen({
     port,

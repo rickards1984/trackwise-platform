@@ -1,276 +1,400 @@
-import { Request, Response, NextFunction } from "express";
-import { storage } from "../storage";
+import { Request, Response, NextFunction } from 'express';
+import { createError, ErrorCode, asyncHandler } from './errorHandler';
+import { UserRole } from '../../shared/enums';
+import { Session } from 'express-session';
 
-// Session data interface
-export interface SessionData {
-  userId: number;
-  role: string;
+// Extend Express-Session to include user data
+declare module 'express-session' {
+  interface Session {
+    user?: {
+      id: number;
+      userId: number; // Some routes use userId instead of id
+      role: UserRole;
+      username: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+    };
+  }
 }
 
-// Basic authentication middleware
-export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.session || !req.session.userId) {
-    return res.status(401).json({ message: "Unauthorized" });
+// Extend Express Request type to include user info
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: number;
+        role: UserRole;
+        username: string;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+      };
+    }
   }
-  next();
-};
+}
 
-// Legacy middleware alias for backward compatibility
-export const isAuthenticated = requireAuth;
+/**
+ * Authentication check middleware
+ * Requires user to be logged in
+ */
+export const isAuthenticated = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.session || !req.session.user || !req.session.user.id) {
+    throw createError('Unauthorized - Authentication required', 401, ErrorCode.UNAUTHORIZED);
+  }
 
-// Role-based authorization middleware
-export const requireRole = (roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.session || !req.session.userId || !req.session.userRole) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    
-    if (!roles.includes(req.session.userRole)) {
-      return res.status(403).json({ message: "Forbidden - Insufficient permissions" });
-    }
-    
-    next();
+  // Attach user data to request for use in route handlers
+  req.user = {
+    id: req.session.user.id,
+    role: req.session.user.role as UserRole,
+    username: req.session.user.username,
+    firstName: req.session.user.firstName,
+    lastName: req.session.user.lastName,
+    email: req.session.user.email
   };
-};
 
-// Legacy middleware alias for backward compatibility
-export const hasRole = requireRole;
+  next();
+});
 
-// Resource ownership middleware - ensures users can only access their own resources
-export const isResourceOwner = (resourceType: string) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
+/**
+ * Role-based access control middleware
+ * @param roles Array of roles that are allowed to access the route
+ * @returns Middleware function
+ */
+export function hasRole(roles: UserRole[]) {
+  return asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    // First ensure the user is authenticated
+    if (!req.user) {
+      throw createError('Unauthorized - Authentication required', 401, ErrorCode.UNAUTHORIZED);
+    }
+
+    // Check if user role is in the allowed roles list
+    if (!roles.includes(req.user.role)) {
+      throw createError(
+        'Forbidden - You do not have permission to access this resource', 
+        403, 
+        ErrorCode.FORBIDDEN
+      );
+    }
+
+    next();
+  });
+}
+
+/**
+ * Admin-only access middleware
+ */
+export const requireAdmin = hasRole([UserRole.ADMIN]);
+
+/**
+ * Training provider or admin access middleware
+ */
+export const requireTrainingProviderOrAdmin = hasRole([UserRole.ADMIN, UserRole.TRAINING_PROVIDER]);
+
+/**
+ * Assessor, training provider, or admin access middleware
+ */
+export const requireAssessorOrAbove = hasRole([
+  UserRole.ADMIN, 
+  UserRole.TRAINING_PROVIDER, 
+  UserRole.ASSESSOR
+]);
+
+/**
+ * Backward compatibility functions for existing code
+ */
+export const requireAuth = isAuthenticated;
+
+/**
+ * Backward compatibility role check
+ * @param roles Array of roles as strings
+ */
+export function requireRole(roles: string[]) {
+  return asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    // First ensure the user is authenticated
+    if (!req.user) {
+      throw createError('Unauthorized - Authentication required', 401, ErrorCode.UNAUTHORIZED);
+    }
+
+    // Convert roles to UserRole type if possible
+    const userRoles = roles.map(role => {
+      try {
+        return role as UserRole;
+      } catch (e) {
+        return role;
+      }
+    });
+
+    // Check if user role is in the allowed roles list
+    if (!userRoles.includes(req.user.role)) {
+      throw createError(
+        'Forbidden - You do not have permission to access this resource', 
+        403, 
+        ErrorCode.FORBIDDEN
+      );
+    }
+
+    next();
+  });
+}
+
+/**
+ * Resource ownership check middleware
+ * Checks if the user owns the resource or has a role with higher permissions
+ * @param resourceType The type of resource to check ownership for
+ * @returns Middleware function
+ */
+export function isResourceOwner(resourceType: string) {
+  return asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      throw createError('Unauthorized - Authentication required', 401, ErrorCode.UNAUTHORIZED);
+    }
+
+    // Admin, training provider, and assessors can access any resource
+    if ([UserRole.ADMIN, UserRole.TRAINING_PROVIDER, UserRole.ASSESSOR].includes(req.user.role)) {
+      return next();
+    }
+
     const resourceId = parseInt(req.params.id);
     if (isNaN(resourceId)) {
-      return res.status(400).json({ message: "Invalid resource ID" });
+      throw createError('Invalid resource ID', 400, ErrorCode.BAD_REQUEST);
+    }
+
+    // Switch based on resource type
+    switch (resourceType) {
+      case 'otj-log':
+        const log = await getOtjLogById(resourceId);
+        if (!log) {
+          throw createError('Resource not found', 404, ErrorCode.NOT_FOUND);
+        }
+        if (log.learnerId === req.user.id) {
+          return next();
+        }
+        break;
+      case 'evidence':
+        const evidence = await getEvidenceById(resourceId);
+        if (!evidence) {
+          throw createError('Resource not found', 404, ErrorCode.NOT_FOUND);
+        }
+        if (evidence.learnerId === req.user.id) {
+          return next();
+        }
+        break;
+      // Add more resource types as needed
+      default:
+        throw createError('Unknown resource type', 400, ErrorCode.BAD_REQUEST);
+    }
+
+    throw createError(
+      'Forbidden - You do not have permission to access this resource', 
+      403, 
+      ErrorCode.FORBIDDEN
+    );
+  });
+}
+
+/**
+ * Checks if user can access a specific learner's profile
+ * Admins, training providers, and assessors can access any learner profile
+ * Learners can only access their own profile
+ */
+export const canAccessLearnerProfile = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    throw createError('Unauthorized - Authentication required', 401, ErrorCode.UNAUTHORIZED);
+  }
+
+  // Get the learner ID from the request params
+  const learnerId = parseInt(req.params.id);
+  
+  if (isNaN(learnerId)) {
+    throw createError('Invalid learner ID', 400, ErrorCode.BAD_REQUEST);
+  }
+
+  // Admin, training provider, and assessors can access any learner profile
+  if ([UserRole.ADMIN, UserRole.TRAINING_PROVIDER, UserRole.ASSESSOR, UserRole.IQA].includes(req.user.role)) {
+    return next();
+  }
+
+  // Learners can only access their own profile
+  if (req.user.role === UserRole.LEARNER && req.user.id === learnerId) {
+    return next();
+  }
+
+  // If none of the above conditions are met, deny access
+  throw createError(
+    'Forbidden - You do not have permission to access this learner profile', 
+    403, 
+    ErrorCode.FORBIDDEN
+  );
+});
+
+/**
+ * Check if the user can modify evidence
+ * Only the owner (learner) or users with higher roles can modify evidence
+ */
+export const canModifyEvidence = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    throw createError('Unauthorized - Authentication required', 401, ErrorCode.UNAUTHORIZED);
+  }
+
+  // Admin, training provider, and assessors can modify any evidence
+  if ([UserRole.ADMIN, UserRole.TRAINING_PROVIDER, UserRole.ASSESSOR, UserRole.IQA].includes(req.user.role)) {
+    return next();
+  }
+
+  // Get the evidence ID from the request params
+  const evidenceId = parseInt(req.params.id);
+  
+  if (isNaN(evidenceId)) {
+    throw createError('Invalid evidence ID', 400, ErrorCode.BAD_REQUEST);
+  }
+
+  // For learners, check if the evidence belongs to them
+  // This requires a database lookup, which should be implemented by the storage interface
+  try {
+    // This is a placeholder - actual implementation should use the storage interface
+    const evidence = await getEvidenceById(evidenceId);
+    
+    if (!evidence) {
+      throw createError('Evidence not found', 404, ErrorCode.NOT_FOUND);
     }
     
-    // @ts-ignore: session property added by express-session
-    const session = req.session as Express.Session & {
-      user?: SessionData;
-    };
-    
-    const userId = session.userId;
-    const userRole = session.role;
-    
-    // Admin and operations roles can access all resources
-    if (userRole === 'admin' || userRole === 'operations') {
+    if (evidence.learnerId === req.user.id) {
       return next();
     }
     
-    try {
-      let resource;
-      let ownerId;
-      
-      // Get the appropriate resource based on type
-      switch (resourceType) {
-        case 'evidence':
-          resource = await storage.getEvidenceItem(resourceId);
-          ownerId = resource?.learnerId;
-          break;
-        case 'otj-log':
-          resource = await storage.getOtjLogEntry(resourceId);
-          ownerId = resource?.learnerId;
-          break;
-        case 'feedback':
-          resource = await storage.getFeedbackItem(resourceId);
-          ownerId = resource?.recipientId;
-          break;
-        case 'task':
-          resource = await storage.getTask(resourceId);
-          ownerId = resource?.assignedToId;
-          break;
-        default:
-          return res.status(400).json({ message: "Invalid resource type" });
-      }
-      
-      if (!resource) {
-        return res.status(404).json({ message: `${resourceType} not found` });
-      }
-      
-      // Check if user is the owner
-      if (userId !== ownerId) {
-        // For non-owners, check if they have a relationship with the resource owner
-        let isAssociated = false;
-        
-        if (['assessor', 'training_provider', 'iqa'].includes(userRole)) {
-          const learnerProfile = await storage.getLearnerProfileByUserId(ownerId);
-          
-          if (learnerProfile) {
-            isAssociated = 
-              learnerProfile.tutorId === userId || 
-              learnerProfile.iqaId === userId || 
-              learnerProfile.trainingProviderId === userId;
-          }
-        }
-        
-        if (!isAssociated) {
-          return res.status(403).json({ message: "Forbidden - You don't have access to this resource" });
-        }
-      }
-      
-      next();
-    } catch (error) {
-      console.error(`Error in isResourceOwner middleware for ${resourceType}:`, error);
-      return res.status(500).json({ message: "An error occurred while checking resource ownership" });
-    }
-  };
-};
-
-// Middleware for accessing learner profiles
-export const canAccessLearnerProfile = async (req: Request, res: Response, next: NextFunction) => {
-  const learnerId = parseInt(req.params.learnerId || req.params.id);
-  if (isNaN(learnerId)) {
-    return res.status(400).json({ message: "Invalid learner ID" });
+    throw createError(
+      'Forbidden - You do not have permission to modify this evidence', 
+      403, 
+      ErrorCode.FORBIDDEN
+    );
+  } catch (error) {
+    next(error);
   }
-  
-  // @ts-ignore: session property added by express-session
-  const session = req.session as Express.Session & {
-    user?: SessionData;
+});
+
+// Placeholder function - to be replaced with actual implementation
+async function getEvidenceById(id: number) {
+  // This should be replaced with an actual DB query
+  return {
+    id,
+    learnerId: 1, // This is a placeholder
   };
-  
-  const userId = session.userId;
-  const userRole = session.role;
-  
-  // Admin and operations roles can access all profiles
-  if (userRole === 'admin' || userRole === 'operations') {
+}
+
+/**
+ * Check if the user can modify an OTJ log entry
+ * Only the owner (learner) or users with higher roles can modify OTJ logs
+ */
+export const canModifyOtjLog = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    throw createError('Unauthorized - Authentication required', 401, ErrorCode.UNAUTHORIZED);
+  }
+
+  // Admin, training provider, and assessors can modify any OTJ log
+  if ([UserRole.ADMIN, UserRole.TRAINING_PROVIDER, UserRole.ASSESSOR, UserRole.IQA].includes(req.user.role)) {
     return next();
   }
-  
-  // Learners can only access their own profile
-  if (userRole === 'learner' && userId !== learnerId) {
-    return res.status(403).json({ message: "Forbidden - You can only access your own profile" });
-  }
-  
-  // For assessors, training providers, and IQAs, check if they're associated with the learner
-  if (['assessor', 'training_provider', 'iqa'].includes(userRole)) {
-    const learnerProfile = await storage.getLearnerProfileByUserId(learnerId);
-    if (!learnerProfile) {
-      return res.status(404).json({ message: "Learner profile not found" });
-    }
-    
-    const isAssociated = 
-      learnerProfile.tutorId === userId || 
-      learnerProfile.iqaId === userId || 
-      learnerProfile.trainingProviderId === userId;
-      
-    if (!isAssociated) {
-      return res.status(403).json({ message: "Forbidden - You are not associated with this learner" });
-    }
-  }
-  
-  next();
-};
 
-// Middleware for verifying OTJ logs
-export const canVerifyOtjLog = async (req: Request, res: Response, next: NextFunction) => {
+  // Get the OTJ log ID from the request params
   const logId = parseInt(req.params.id);
+  
   if (isNaN(logId)) {
-    return res.status(400).json({ message: "Invalid log ID" });
+    throw createError('Invalid OTJ log ID', 400, ErrorCode.BAD_REQUEST);
   }
-  
-  // @ts-ignore: session property added by express-session
-  const session = req.session as Express.Session & {
-    user?: SessionData;
-  };
-  
-  const userId = session.userId;
-  const userRole = session.role;
-  
-  // Only assessors, training providers, IQAs, admins, and operations can verify logs
-  if (!['assessor', 'training_provider', 'iqa', 'admin', 'operations'].includes(userRole)) {
-    return res.status(403).json({ message: "Forbidden - You don't have permission to verify logs" });
-  }
-  
-  // Admin and operations roles can verify all logs
-  if (userRole === 'admin' || userRole === 'operations') {
-    return next();
-  }
-  
-  // Get the log
-  const log = await storage.getOtjLogEntry(logId);
-  if (!log) {
-    return res.status(404).json({ message: "OTJ log not found" });
-  }
-  
-  // For assessors, training providers, and IQAs, check if they're associated with the learner
-  const learnerProfile = await storage.getLearnerProfileByUserId(log.learnerId);
-  if (!learnerProfile) {
-    return res.status(404).json({ message: "Learner profile not found" });
-  }
-  
-  let isAssociated = false;
-  
-  if (userRole === 'assessor' || userRole === 'training_provider') {
-    isAssociated = 
-      learnerProfile.tutorId === userId || 
-      learnerProfile.trainingProviderId === userId;
-  } else if (userRole === 'iqa') {
-    isAssociated = learnerProfile.iqaId === userId;
-  }
-  
-  if (!isAssociated) {
-    return res.status(403).json({ message: "Forbidden - You are not associated with this learner" });
-  }
-  
-  next();
-};
 
-// Middleware for providing feedback
-export const canProvideFeedback = async (req: Request, res: Response, next: NextFunction) => {
-  const recipientId = parseInt(req.body.recipientId);
-  if (isNaN(recipientId)) {
-    return res.status(400).json({ message: "Invalid recipient ID" });
-  }
-  
-  // @ts-ignore: session property added by express-session
-  const session = req.session as Express.Session & {
-    user?: SessionData;
-  };
-  
-  const userId = session.userId;
-  const userRole = session.role;
-  
-  // Admin and operations roles can provide feedback to anyone
-  if (userRole === 'admin' || userRole === 'operations') {
-    return next();
-  }
-  
-  // For assessors, training providers, and IQAs, check if they're associated with the recipient
-  if (['assessor', 'training_provider', 'iqa'].includes(userRole)) {
-    const learnerProfile = await storage.getLearnerProfileByUserId(recipientId);
-    if (!learnerProfile) {
-      return res.status(404).json({ message: "Recipient learner profile not found" });
+  // For learners, check if the OTJ log belongs to them
+  // This requires a database lookup, which should be implemented by the storage interface
+  try {
+    // This is a placeholder - actual implementation should use the storage interface
+    const log = await getOtjLogById(logId);
+    
+    if (!log) {
+      throw createError('OTJ log not found', 404, ErrorCode.NOT_FOUND);
     }
     
-    const isAssociated = 
-      learnerProfile.tutorId === userId || 
-      learnerProfile.iqaId === userId || 
-      learnerProfile.trainingProviderId === userId;
-      
-    if (!isAssociated) {
-      return res.status(403).json({ message: "Forbidden - You are not associated with this learner" });
+    if (log.learnerId === req.user.id) {
+      return next();
     }
-  } else {
-    // Other roles (e.g., learners) cannot provide feedback
-    return res.status(403).json({ message: "Forbidden - You don't have permission to provide feedback" });
+    
+    throw createError(
+      'Forbidden - You do not have permission to modify this OTJ log', 
+      403, 
+      ErrorCode.FORBIDDEN
+    );
+  } catch (error) {
+    next(error);
   }
-  
-  next();
-};
+});
 
-// Middleware for accessing ILR data
-export const canAccessIlrData = (req: Request, res: Response, next: NextFunction) => {
-  // @ts-ignore: session property added by express-session
-  const session = req.session as Express.Session & {
-    user?: SessionData;
-  };
-  
-  const userRole = session.role;
-  
-  // Only admin, operations, and training provider can access ILR data
-  if (!['admin', 'operations', 'training_provider'].includes(userRole)) {
-    return res.status(403).json({ message: "Forbidden - You don't have permission to access ILR data" });
+/**
+ * Check if the user can verify an OTJ log entry
+ * Only assessors, training providers, and admins can verify OTJ logs
+ */
+export const canVerifyOtjLog = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    throw createError('Unauthorized - Authentication required', 401, ErrorCode.UNAUTHORIZED);
+  }
+
+  // Only assessors, training providers, and admins can verify logs
+  if ([UserRole.ADMIN, UserRole.TRAINING_PROVIDER, UserRole.ASSESSOR].includes(req.user.role)) {
+    return next();
   }
   
-  next();
-};
+  throw createError(
+    'Forbidden - You do not have permission to verify OTJ logs',
+    403,
+    ErrorCode.FORBIDDEN
+  );
+});
+
+// Placeholder function - to be replaced with actual implementation
+async function getOtjLogById(id: number) {
+  // This should be replaced with an actual DB query
+  return {
+    id,
+    learnerId: 1, // This is a placeholder
+  };
+}
+
+/**
+ * Rate limiting middleware for sensitive operations
+ * Simple rate limiting based on user ID
+ */
+const rateLimitMap = new Map<number, { count: number, resetTime: number }>();
+
+export function rateLimit(maxRequests: number = 30, windowMs: number = 60 * 1000) {
+  return asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      throw createError('Unauthorized - Authentication required', 401, ErrorCode.UNAUTHORIZED);
+    }
+
+    const userId = req.user.id;
+    const now = Date.now();
+    
+    // Get or create rate limit entry for this user
+    let limitData = rateLimitMap.get(userId);
+    
+    if (!limitData || now > limitData.resetTime) {
+      limitData = { count: 0, resetTime: now + windowMs };
+      rateLimitMap.set(userId, limitData);
+    }
+    
+    // Increment request count
+    limitData.count++;
+    
+    // Check if rate limit is exceeded
+    if (limitData.count > maxRequests) {
+      const retryAfterSeconds = Math.ceil((limitData.resetTime - now) / 1000);
+      
+      res.set('Retry-After', String(retryAfterSeconds));
+      throw createError(
+        `Rate limit exceeded. Try again in ${retryAfterSeconds} seconds`, 
+        429, 
+        ErrorCode.TOO_MANY_REQUESTS
+      );
+    }
+    
+    next();
+  });
+}

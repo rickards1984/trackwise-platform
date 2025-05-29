@@ -74,7 +74,8 @@ export async function handleUserMessage(input: AiAssistantInput): Promise<AiAssi
     
     // Add better error handling for missing choices
     const raw = completion.choices?.[0]?.message?.content || '{}';
-    console.log("AI Assistant Raw Output:", raw);
+    // Avoid logging raw AI outputs which might contain sensitive information
+    console.log("AI Assistant response received successfully");
     
     let parsedResponse;
     try {
@@ -106,7 +107,7 @@ export async function handleUserMessage(input: AiAssistantInput): Promise<AiAssi
         
         await storage.createAiAssistantConversation(conversation);
       } else {
-        console.log("Warning: Could not find user for userId:", input.userId);
+        console.log("Warning: Unable to store AI conversation");
       }
     } catch (dbError) {
       console.error("Error storing conversation in database:", dbError);
@@ -223,7 +224,7 @@ export async function generateResourceRecommendations(userId: number, ksbIds: nu
   try {
     // Validate input
     if (!userId || !ksbIds || !Array.isArray(ksbIds) || ksbIds.length === 0) {
-      console.warn("Invalid input for resource recommendations:", { userId, ksbIdsProvided: !!ksbIds, ksbIdsLength: ksbIds?.length });
+      console.warn("Invalid input for resource recommendations");
       return ["Please provide valid KSB IDs to get resource recommendations."];
     }
     
@@ -268,9 +269,9 @@ export async function generateResourceRecommendations(userId: number, ksbIds: nu
     // Log user info for tracking
     try {
       const user = await storage.getUser(userId);
-      console.log(`Generating resource recommendations for user: ${user?.firstName} ${user?.lastName} (ID: ${userId})`);
+      console.log("Generating resource recommendations");
     } catch (userError) {
-      console.warn(`Could not fetch user info for ID ${userId} when generating resources:`, userError);
+      console.warn("Could not fetch user info when generating resources");
     }
     
     // Generate recommendations using OpenAI
@@ -288,14 +289,14 @@ export async function generateResourceRecommendations(userId: number, ksbIds: nu
     
     // Improved error handling for missing choices
     const raw = completion.choices?.[0]?.message?.content || '{"resources":[]}';
-    console.log("AI Resource Recommendations Raw Output:", raw);
+    console.log("AI Resource Recommendations generated successfully");
     
     let parsedResponse;
     try {
       parsedResponse = JSON.parse(raw);
       
       if (!parsedResponse.resources || !Array.isArray(parsedResponse.resources)) {
-        console.warn("AI response missing resources array:", parsedResponse);
+        console.warn("AI response missing resources array");
         return ["Error: AI response format was incorrect. Please try again."];
       }
       
@@ -309,7 +310,7 @@ export async function generateResourceRecommendations(userId: number, ksbIds: nu
         : ["No specific resources were found for these KSBs. Please try with different KSBs."];
     } catch (error) {
       console.error("Error parsing resource recommendations:", error);
-      console.error("Raw response content:", raw);
+      console.error("Raw response format was invalid");
       return ["Error generating resource recommendations. Please try again."];
     }
     
@@ -390,8 +391,7 @@ export async function analyzeApprenticeshipStandard(standardText: string): Promi
     
     // Improved error handling for missing choices
     const raw = completion.choices?.[0]?.message?.content || '{}';
-    console.log("AI Standard Analysis Raw Output (truncated):", 
-      raw.length > 500 ? raw.substring(0, 500) + '...(truncated for logging)' : raw);
+    console.log("AI Standard Analysis completed successfully");
     
     let parsedResponse;
     try {
@@ -399,15 +399,7 @@ export async function analyzeApprenticeshipStandard(standardText: string): Promi
       
       // Validate the structure of the response
       if (!parsedResponse.title || !parsedResponse.level) {
-        console.warn("AI response missing key fields:", 
-          JSON.stringify({ 
-            has_title: !!parsedResponse.title, 
-            has_level: !!parsedResponse.level,
-            has_knowledge: Array.isArray(parsedResponse.knowledge),
-            has_skills: Array.isArray(parsedResponse.skills),
-            has_behaviors: Array.isArray(parsedResponse.behaviors)
-          })
-        );
+        console.warn("AI response missing required fields");
       }
       
       return {
@@ -420,7 +412,7 @@ export async function analyzeApprenticeshipStandard(standardText: string): Promi
       };
     } catch (error) {
       console.error("Error parsing standard analysis:", error);
-      console.error("Raw response content:", raw.substring(0, 500) + '...(truncated)');
+      console.error("Raw response format was invalid");
       throw new Error("Failed to parse the standard analysis response");
     }
     

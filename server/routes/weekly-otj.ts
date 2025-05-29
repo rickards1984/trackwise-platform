@@ -62,11 +62,84 @@ router.get("/learner/:learnerId", requireAuth, async (req, res) => {
         ![UserRole.ASSESSOR, UserRole.TRAINING_PROVIDER, UserRole.ADMIN, UserRole.IQA].includes(userRole)) {
       return res.status(403).json({ message: "Forbidden: You don't have permission to view this data" });
     }
+    
+    // Optional date range filtering and pagination parameters
+    const { startDate, endDate, page, limit } = req.query;
+    
+    // Process pagination parameters
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 10; // Default to 10 items per page
+    const offset = (pageNum - 1) * limitNum;
+    
+    // If date parameters are provided, validate they are proper dates
+    let start: Date | undefined;
+    let end: Date | undefined;
+    
+    if (startDate) {
+      start = new Date(startDate as string);
+      if (isNaN(start.getTime())) {
+        return res.status(400).json({ message: "Invalid start date format. Please use YYYY-MM-DD" });
+      }
+      
+      // Security requirement: Restrict access to historical data (older than 2 years)
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+      
+      if (start < twoYearsAgo && userRole !== UserRole.ADMIN) {
+        // For non-admins, don't allow access to data older than 2 years
+        start = twoYearsAgo;
+      }
+    }
+    
+    if (endDate) {
+      end = new Date(endDate as string);
+      if (isNaN(end.getTime())) {
+        return res.status(400).json({ message: "Invalid end date format. Please use YYYY-MM-DD" });
+      }
+      
+      // Don't allow future dates
+      const currentDate = new Date();
+      if (end > currentDate) {
+        end = currentDate;
+      }
+    }
 
-    const weeklyTrackings = await storage.getWeeklyOtjTrackingsByLearnerId(learnerId);
-    return res.json(weeklyTrackings);
+    // Get the total count for pagination metadata
+    const totalCount = await storage.countWeeklyOtjTrackingsByLearnerId(learnerId, start, end);
+    
+    // Get the paginated data
+    const weeklyTrackings = await storage.getWeeklyOtjTrackingsByLearnerId(
+      learnerId, 
+      start, 
+      end,
+      limitNum,
+      offset
+    );
+    
+    // For non-admins, extra protection to filter out any data older than 2 years that might slip through
+    let items = weeklyTrackings;
+    if (userRole !== UserRole.ADMIN) {
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+      
+      items = weeklyTrackings.filter(tracking => 
+        new Date(tracking.weekStartDate) >= twoYearsAgo
+      );
+    }
+    
+    // Return the data with pagination metadata
+    return res.status(200).json({
+      items: items,
+      pagination: {
+        total: totalCount,
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(totalCount / limitNum)
+      }
+    });
   } catch (error) {
-    console.error("Error fetching weekly OTJ tracking records:", error);
+    // Security improvement: Don't log sensitive error details
+    console.error("Error fetching weekly OTJ tracking records");
     return res.status(500).json({ message: "Error fetching weekly OTJ tracking records" });
   }
 });
@@ -83,6 +156,30 @@ router.get("/learner/:learnerId/week/:weekDate", requireAuth, async (req, res) =
     const weekDate = new Date(req.params.weekDate);
     if (isNaN(weekDate.getTime())) {
       return res.status(400).json({ message: "Invalid date format. Please use YYYY-MM-DD" });
+    }
+    
+    // Security requirement: Validate the date is not in the future
+    const currentDate = new Date();
+    if (weekDate > currentDate) {
+      return res.status(400).json({ 
+        message: "Future dates are not allowed", 
+        details: "You cannot access data for dates that haven't occurred yet" 
+      });
+    }
+    
+    // Security requirement: Restrict access to historical data (older than 2 years)
+    const twoYearsAgo = new Date();
+    twoYearsAgo.setFullYear(currentDate.getFullYear() - 2);
+    
+    if (weekDate < twoYearsAgo) {
+      // Only admins can access very old data
+      const userRole = req.session.user?.role as UserRole;
+      if (userRole !== UserRole.ADMIN) {
+        return res.status(403).json({ 
+          message: "Access restricted", 
+          details: "Data older than 2 years requires administrative access" 
+        });
+      }
     }
 
     // Check if the requesting user is the learner or has permission
@@ -101,7 +198,8 @@ router.get("/learner/:learnerId/week/:weekDate", requireAuth, async (req, res) =
 
     return res.json(weeklyTracking);
   } catch (error) {
-    console.error("Error fetching weekly OTJ tracking for week:", error);
+    // Improved error handling for security - avoid exposing error details
+    console.error("Error fetching weekly OTJ tracking for week");
     return res.status(500).json({ message: "Error fetching weekly OTJ tracking for week" });
   }
 });

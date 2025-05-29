@@ -23,7 +23,7 @@ export async function seedDatabase() {
         status: 'active' // Add status to make login work
       });
       
-      console.log('Admin user created:', admin.id);
+      console.log('Initial user accounts created successfully');
     }
     
     // Create a sample apprenticeship standard if none exists
@@ -37,7 +37,7 @@ export async function seedDatabase() {
         minimumOtjHours: 312 // 6 hours per week for 52 weeks
       });
       
-      console.log('Sample apprenticeship standard created:', standard.id);
+      console.log('Sample apprenticeship standard created successfully');
       
       // Add some sample KSB elements
       const ksbElements = [
@@ -74,28 +74,29 @@ export async function seedDatabase() {
     if (!existingLearner) {
       const learner = await storage.createUser({
         username: 'learner',
-        password: 'learner123', // In production, use a secure password
+        password: 'password', // Simple password for demo
         firstName: 'Sample',
         lastName: 'Learner',
         email: 'learner@example.com',
         role: 'learner',
         avatarUrl: null,
-        status: 'active' // Add status to make login work
+        status: 'active' // Makes login work
       });
       
-      console.log('Sample learner created:', learner.id);
+      console.log('Sample learner created successfully');
       
       // Create a sample learner profile
-      const standard = standards.length > 0 ? standards[0] : await storage.getAllApprenticeshipStandards();
+      // Get the latest standards list (in case we just created one)
+      const allStandards = await storage.getAllApprenticeshipStandards();
       
-      if (standard) {
+      if (allStandards && allStandards.length > 0) {
         const startDate = new Date();
         const endDate = new Date();
         endDate.setFullYear(endDate.getFullYear() + 2); // 2 year apprenticeship
         
         const profile = await storage.createLearnerProfile({
           userId: learner.id,
-          standardId: standard.id,
+          standardId: allStandards[0].id,
           startDate,
           expectedEndDate: endDate,
           tutorId: null,
@@ -104,7 +105,7 @@ export async function seedDatabase() {
           accessibilityPreferences: null
         });
         
-        console.log('Sample learner profile created:', profile.id);
+        console.log('Sample learner profile created successfully');
       }
     }
     
@@ -114,11 +115,12 @@ export async function seedDatabase() {
     if (!existingTutor) {
       const tutor = await storage.createUser({
         username: 'tutor',
-        password: 'tutor123', // In production, use a secure password
+        password: 'password', // Simple password for demo
         firstName: 'Sample',
         lastName: 'Tutor',
         email: 'tutor@example.com',
         role: 'assessor',
+        status: 'active',
         avatarUrl: null
       });
       
@@ -131,11 +133,12 @@ export async function seedDatabase() {
     if (!existingIQA) {
       const iqa = await storage.createUser({
         username: 'iqa',
-        password: 'iqa123', // In production, use a secure password
+        password: 'password', // Simple password for demo
         firstName: 'Sample',
         lastName: 'IQA',
         email: 'iqa@example.com',
         role: 'iqa',
+        status: 'active',
         avatarUrl: null
       });
       

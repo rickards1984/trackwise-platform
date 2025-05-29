@@ -1,56 +1,93 @@
-// Shared enums for the application
-
-// User roles in the system
+/**
+ * User role enum for type-safe role checking
+ */
 export enum UserRole {
-  LEARNER = 'learner',
   ADMIN = 'admin',
   TRAINING_PROVIDER = 'training_provider',
   ASSESSOR = 'assessor',
   IQA = 'iqa',
-  OPERATIONS = 'operations',
+  LEARNER = 'learner',
+  OPERATIONS = 'operations'
 }
 
-// User status in the system
+/**
+ * User status enum for type-safe status checking
+ */
 export enum UserStatus {
   UNVERIFIED = 'unverified',
   PENDING_APPROVAL = 'pending_approval',
   ACTIVE = 'active',
   SUSPENDED = 'suspended',
-  DEACTIVATED = 'deactivated',
+  DEACTIVATED = 'deactivated'
 }
 
-// OTJ log status
+/**
+ * Evidence status enum for type-safe status checking
+ */
+export enum EvidenceStatus {
+  DRAFT = 'draft',
+  SUBMITTED = 'submitted',
+  IN_REVIEW = 'in_review',
+  APPROVED = 'approved',
+  NEEDS_REVISION = 'needs_revision'
+}
+
+/**
+ * OTJ log status enum for type-safe status checking
+ */
 export enum OtjLogStatus {
   DRAFT = 'draft',
   SUBMITTED = 'submitted',
   APPROVED = 'approved',
-  REJECTED = 'rejected',
+  REJECTED = 'rejected'
 }
 
-// OTJ category
+/**
+ * ILR upload status enum for type-safe status checking
+ */
+export enum IlrUploadStatus {
+  PENDING = 'pending',
+  VALIDATING = 'validating',
+  PROCESSING = 'processing',
+  COMPLETE = 'complete',
+  ERROR = 'error'
+}
+
+/**
+ * OTJ category enum for type-safe category checking
+ */
 export enum OtjCategory {
   OTJ = 'otj',
-  ENRICHMENT = 'enrichment',
+  ENRICHMENT = 'enrichment'
 }
 
-// Review roles (for signatures)
-export enum ReviewSignatureRole {
-  LEARNER = 'learner',
-  EMPLOYER = 'employer',
-  TUTOR = 'tutor',
+/**
+ * Weekly tracking status enum for type-safe status checking
+ */
+export enum WeeklyTrackingStatus {
+  PENDING = 'pending',
+  COMPLETE = 'complete',
+  INCOMPLETE = 'incomplete'
 }
 
-// Review status
+/**
+ * Evidence type enum for type-safe type checking
+ */
+export enum EvidenceType {
+  DOCUMENT = 'document',
+  PROJECT = 'project',
+  IMAGE = 'image',
+  VIDEO = 'video',
+  PRESENTATION = 'presentation',
+  OTHER = 'other'
+}
+
+/**
+ * Review status enum for type-safe status checking
+ */
 export enum ReviewStatus {
   SCHEDULED = 'scheduled',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
-  RESCHEDULED = 'rescheduled',
-}
-
-// Weekly tracking status
-export enum WeeklyTrackingStatus {
-  PENDING = 'pending',
-  COMPLETE = 'complete',
-  INCOMPLETE = 'incomplete',
+  RESCHEDULED = 'rescheduled'
 }

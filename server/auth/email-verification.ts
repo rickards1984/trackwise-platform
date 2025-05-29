@@ -15,9 +15,20 @@ export function generateToken(): string {
  * @returns full verification URL
  */
 export function generateVerificationUrl(token: string): string {
-  // Use environment-aware domain construction
-  const baseUrl = process.env.BASE_URL || `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}`;
-  return `${baseUrl}/auth/verify-email?token=${token}`;
+  // Use environment-aware domain construction with fallbacks
+  let baseUrl = process.env.BASE_URL;
+  
+  if (!baseUrl) {
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.HOST || 'localhost';
+    const port = process.env.PORT || '5000';
+    
+    // Only add port for non-standard ports and non-production environments
+    const portSuffix = (domain === 'localhost' || process.env.NODE_ENV !== 'production') ? `:${port}` : '';
+    baseUrl = `${protocol}://${domain}${portSuffix}`;
+  }
+  
+  return `${baseUrl}/auth/verify-email?token=${encodeURIComponent(token)}`;
 }
 
 /**

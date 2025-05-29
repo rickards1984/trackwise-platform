@@ -53,7 +53,9 @@ export interface IStorage {
   
   // Evidence Item operations
   getEvidenceItem(id: number): Promise<EvidenceItem | undefined>;
-  getEvidenceItemsByLearnerId(learnerId: number): Promise<EvidenceItem[]>;
+  getEvidenceItemsByLearnerId(learnerId: number, status?: string | null, limit?: number, offset?: number): Promise<EvidenceItem[]>;
+  countEvidenceItemsByLearnerId(learnerId: number, status?: string | null): Promise<number>;
+  getEvidenceItemsByDateRange(startDate: Date, endDate: Date): Promise<EvidenceItem[]>;
   createEvidenceItem(item: InsertEvidenceItem): Promise<EvidenceItem>;
   updateEvidenceItem(id: number, item: Partial<InsertEvidenceItem>): Promise<EvidenceItem | undefined>;
   deleteEvidenceItem(id: number): Promise<void>;
@@ -65,8 +67,22 @@ export interface IStorage {
   
   // OTJ Log Entry operations
   getOtjLogEntry(id: number): Promise<OtjLogEntry | undefined>;
-  getOtjLogEntriesByLearnerId(learnerId: number): Promise<OtjLogEntry[]>;
-  getOtjLogEntriesByLearnerIdAndDateRange(learnerId: number, startDate: Date, endDate: Date): Promise<OtjLogEntry[]>;
+  getOtjLogEntriesByLearnerId(learnerId: number, status?: string | null, limit?: number, offset?: number): Promise<OtjLogEntry[]>;
+  countOtjLogEntriesByLearnerId(learnerId: number, status?: string | null): Promise<number>;
+  getOtjLogEntriesByLearnerIdAndDateRange(
+    learnerId: number, 
+    startDate: Date, 
+    endDate: Date, 
+    status?: string | null,
+    limit?: number, 
+    offset?: number
+  ): Promise<OtjLogEntry[]>;
+  countOtjLogEntriesByLearnerIdAndDateRange(
+    learnerId: number, 
+    startDate: Date, 
+    endDate: Date,
+    status?: string | null
+  ): Promise<number>;
   createOtjLogEntry(entry: InsertOtjLogEntry): Promise<OtjLogEntry>;
   updateOtjLogEntry(id: number, entry: Partial<InsertOtjLogEntry>): Promise<OtjLogEntry | undefined>;
   verifyOtjLogEntry(id: number, verifierId: number): Promise<OtjLogEntry | undefined>;
@@ -74,7 +90,18 @@ export interface IStorage {
   
   // Weekly OTJ Hour Tracking operations
   getWeeklyOtjTracking(id: number): Promise<WeeklyOtjTracking | undefined>;
-  getWeeklyOtjTrackingsByLearnerId(learnerId: number): Promise<WeeklyOtjTracking[]>;
+  getWeeklyOtjTrackingsByLearnerId(
+    learnerId: number, 
+    startDate?: Date, 
+    endDate?: Date,
+    limit?: number,
+    offset?: number
+  ): Promise<WeeklyOtjTracking[]>;
+  countWeeklyOtjTrackingsByLearnerId(
+    learnerId: number, 
+    startDate?: Date, 
+    endDate?: Date
+  ): Promise<number>;
   getWeeklyOtjTrackingByLearnerIdAndWeek(learnerId: number, weekStartDate: Date): Promise<WeeklyOtjTracking | undefined>;
   createWeeklyOtjTracking(tracking: InsertWeeklyOtjTracking): Promise<WeeklyOtjTracking>;
   updateWeeklyOtjTracking(id: number, tracking: Partial<InsertWeeklyOtjTracking>): Promise<WeeklyOtjTracking | undefined>;
@@ -129,7 +156,7 @@ export interface IStorage {
   getUpcomingTwelveWeeklyReviews(days: number): Promise<TwelveWeeklyReview[]>; // Get reviews scheduled within next X days
   createTwelveWeeklyReview(review: InsertTwelveWeeklyReview): Promise<TwelveWeeklyReview>;
   updateTwelveWeeklyReview(id: number, review: Partial<InsertTwelveWeeklyReview>): Promise<TwelveWeeklyReview | undefined>;
-  signTwelveWeeklyReview(id: number, role: 'learner' | 'employer' | 'tutor', userId: number): Promise<TwelveWeeklyReview | undefined>;
+  signTwelveWeeklyReview(id: number, role: 'learner' | 'employer' | 'tutor' | 'admin' | 'iqa', userId: number): Promise<TwelveWeeklyReview | undefined>;
   rescheduleTwelveWeeklyReview(id: number, newDate: Date): Promise<TwelveWeeklyReview | undefined>;
 }
 
@@ -623,9 +650,63 @@ export class MemStorage implements IStorage {
     return this.evidenceItems.get(id);
   }
 
-  async getEvidenceItemsByLearnerId(learnerId: number): Promise<EvidenceItem[]> {
+  async getEvidenceItemsByLearnerId(
+    learnerId: number, 
+    status?: string | null, 
+    limit?: number, 
+    offset?: number
+  ): Promise<EvidenceItem[]> {
+    // Filter by learner ID and optional status
+    let filteredItems = Array.from(this.evidenceItems.values()).filter(
+      (item) => {
+        // Always filter by learner ID
+        const learnerMatch = item.learnerId === learnerId;
+        
+        // If status is provided, also filter by status
+        const statusMatch = status ? item.status === status : true;
+        
+        return learnerMatch && statusMatch;
+      }
+    );
+    
+    // Sort by submission date (newest first)
+    filteredItems.sort((a, b) => {
+      const dateA = new Date(a.submissionDate).getTime();
+      const dateB = new Date(b.submissionDate).getTime();
+      return dateB - dateA;
+    });
+    
+    // Apply pagination if both limit and offset are provided
+    if (typeof limit === 'number' && typeof offset === 'number') {
+      return filteredItems.slice(offset, offset + limit);
+    }
+    
+    return filteredItems;
+  }
+  
+  async countEvidenceItemsByLearnerId(learnerId: number, status?: string | null): Promise<number> {
     return Array.from(this.evidenceItems.values()).filter(
-      (item) => item.learnerId === learnerId,
+      (item) => {
+        // Always filter by learner ID
+        const learnerMatch = item.learnerId === learnerId;
+        
+        // If status is provided, also filter by status
+        const statusMatch = status ? item.status === status : true;
+        
+        return learnerMatch && statusMatch;
+      }
+    ).length;
+  }
+  
+  async getEvidenceItemsByDateRange(startDate: Date, endDate: Date): Promise<EvidenceItem[]> {
+    const startTime = startDate.getTime();
+    const endTime = endDate.getTime();
+    
+    return Array.from(this.evidenceItems.values()).filter(
+      (item) => {
+        const itemDate = new Date(item.submissionDate).getTime();
+        return itemDate >= startTime && itemDate <= endTime;
+      }
     );
   }
 
@@ -689,16 +770,108 @@ export class MemStorage implements IStorage {
     return this.otjLogEntries.get(id);
   }
 
-  async getOtjLogEntriesByLearnerId(learnerId: number): Promise<OtjLogEntry[]> {
-    return Array.from(this.otjLogEntries.values()).filter(
-      (entry) => entry.learnerId === learnerId,
+  async getOtjLogEntriesByLearnerId(
+    learnerId: number,
+    status?: string | null,
+    limit?: number,
+    offset?: number
+  ): Promise<OtjLogEntry[]> {
+    // Filter by learner ID and optional status
+    let filteredEntries = Array.from(this.otjLogEntries.values()).filter(
+      (entry) => {
+        // Always filter by learner ID
+        const learnerMatch = entry.learnerId === learnerId;
+        
+        // If status is provided, also filter by status
+        const statusMatch = status ? entry.status === status : true;
+        
+        return learnerMatch && statusMatch;
+      }
     );
+    
+    // Sort by date (newest first)
+    filteredEntries.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
+    });
+    
+    // Apply pagination if both limit and offset are provided
+    if (typeof limit === 'number' && typeof offset === 'number') {
+      return filteredEntries.slice(offset, offset + limit);
+    }
+    
+    return filteredEntries;
+  }
+  
+  async countOtjLogEntriesByLearnerId(
+    learnerId: number,
+    status?: string | null
+  ): Promise<number> {
+    return Array.from(this.otjLogEntries.values()).filter(
+      (entry) => {
+        // Always filter by learner ID
+        const learnerMatch = entry.learnerId === learnerId;
+        
+        // If status is provided, also filter by status
+        const statusMatch = status ? entry.status === status : true;
+        
+        return learnerMatch && statusMatch;
+      }
+    ).length;
   }
 
-  async getOtjLogEntriesByLearnerIdAndDateRange(learnerId: number, startDate: Date, endDate: Date): Promise<OtjLogEntry[]> {
-    return Array.from(this.otjLogEntries.values()).filter(
-      (entry) => entry.learnerId === learnerId && entry.date >= startDate && entry.date <= endDate,
+  async getOtjLogEntriesByLearnerIdAndDateRange(
+    learnerId: number, 
+    startDate: Date, 
+    endDate: Date,
+    status?: string | null,
+    limit?: number,
+    offset?: number
+  ): Promise<OtjLogEntry[]> {
+    // Filter entries by learner ID, date range, and optional status
+    let filteredEntries = Array.from(this.otjLogEntries.values()).filter(
+      (entry) => {
+        const entryDate = new Date(entry.date);
+        const dateMatch = entryDate >= startDate && entryDate <= endDate;
+        const learnerMatch = entry.learnerId === learnerId;
+        const statusMatch = status ? entry.status === status : true;
+        
+        return learnerMatch && dateMatch && statusMatch;
+      }
     );
+    
+    // Sort by date (newest first)
+    filteredEntries.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
+    });
+    
+    // Apply pagination if both limit and offset are provided
+    if (typeof limit === 'number' && typeof offset === 'number') {
+      return filteredEntries.slice(offset, offset + limit);
+    }
+    
+    return filteredEntries;
+  }
+  
+  async countOtjLogEntriesByLearnerIdAndDateRange(
+    learnerId: number,
+    startDate: Date,
+    endDate: Date,
+    status?: string | null
+  ): Promise<number> {
+    return Array.from(this.otjLogEntries.values()).filter(
+      (entry) => {
+        const entryDate = new Date(entry.date);
+        const dateMatch = entryDate >= startDate && entryDate <= endDate;
+        const learnerMatch = entry.learnerId === learnerId;
+        const statusMatch = status ? entry.status === status : true;
+        
+        return learnerMatch && dateMatch && statusMatch;
+      }
+    ).length;
   }
 
   async createOtjLogEntry(insertEntry: InsertOtjLogEntry): Promise<OtjLogEntry> {
@@ -756,10 +929,68 @@ export class MemStorage implements IStorage {
     return this.weeklyOtjTrackings.get(id);
   }
 
-  async getWeeklyOtjTrackingsByLearnerId(learnerId: number): Promise<WeeklyOtjTracking[]> {
-    return Array.from(this.weeklyOtjTrackings.values())
-      .filter(tracking => tracking.learnerId === learnerId)
-      .sort((a, b) => new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime());
+  async getWeeklyOtjTrackingsByLearnerId(
+    learnerId: number, 
+    startDate?: Date, 
+    endDate?: Date,
+    limit?: number,
+    offset?: number
+  ): Promise<WeeklyOtjTracking[]> {
+    let trackings = Array.from(this.weeklyOtjTrackings.values())
+      .filter(tracking => tracking.learnerId === learnerId);
+    
+    // Apply date filtering if provided
+    if (startDate) {
+      const startTime = startDate.getTime();
+      trackings = trackings.filter(tracking => 
+        new Date(tracking.weekStartDate).getTime() >= startTime
+      );
+    }
+    
+    if (endDate) {
+      const endTime = endDate.getTime();
+      trackings = trackings.filter(tracking => 
+        new Date(tracking.weekStartDate).getTime() <= endTime
+      );
+    }
+    
+    // Sort by date (newest first)
+    trackings = trackings.sort((a, b) => 
+      new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime()
+    );
+    
+    // Apply pagination if both limit and offset are provided
+    if (typeof limit === 'number' && typeof offset === 'number') {
+      return trackings.slice(offset, offset + limit);
+    }
+    
+    return trackings;
+  }
+  
+  async countWeeklyOtjTrackingsByLearnerId(
+    learnerId: number, 
+    startDate?: Date, 
+    endDate?: Date
+  ): Promise<number> {
+    let trackings = Array.from(this.weeklyOtjTrackings.values())
+      .filter(tracking => tracking.learnerId === learnerId);
+    
+    // Apply date filtering if provided
+    if (startDate) {
+      const startTime = startDate.getTime();
+      trackings = trackings.filter(tracking => 
+        new Date(tracking.weekStartDate).getTime() >= startTime
+      );
+    }
+    
+    if (endDate) {
+      const endTime = endDate.getTime();
+      trackings = trackings.filter(tracking => 
+        new Date(tracking.weekStartDate).getTime() <= endTime
+      );
+    }
+    
+    return trackings.length;
   }
 
   async getWeeklyOtjTrackingByLearnerIdAndWeek(learnerId: number, weekStartDate: Date): Promise<WeeklyOtjTracking | undefined> {
@@ -1121,18 +1352,21 @@ export class MemStorage implements IStorage {
     return updatedReview;
   }
 
-  async signTwelveWeeklyReview(id: number, role: 'learner' | 'employer' | 'tutor', userId: number): Promise<TwelveWeeklyReview | undefined> {
+  async signTwelveWeeklyReview(id: number, role: 'learner' | 'employer' | 'tutor' | 'admin' | 'iqa', userId: number): Promise<TwelveWeeklyReview | undefined> {
     const existingReview = this.twelveWeeklyReviews.get(id);
     if (!existingReview) {
       return undefined;
     }
     
-    // Check if the user has the right to sign this review
-    if (
+    // Special handling for admin/iqa roles - they have elevated permissions
+    const isAdminOrIqa = role === 'admin' || role === 'iqa';
+    
+    // Check if the user has the right to sign this review, skip this check for admin/iqa
+    if (!isAdminOrIqa && (
       (role === 'learner' && existingReview.learnerId !== userId) ||
       (role === 'tutor' && existingReview.tutorId !== userId) ||
       (role === 'employer' && existingReview.employerId !== userId)
-    ) {
+    )) {
       return undefined;
     }
     
@@ -1146,11 +1380,12 @@ export class MemStorage implements IStorage {
     } else if (role === 'employer') {
       updatedReview.signedByEmployer = true;
       updatedReview.employerSignatureDate = now;
-    } else if (role === 'tutor') {
+    } else if (role === 'tutor' || isAdminOrIqa) {
+      // Admin/IQA users sign as tutors
       updatedReview.signedByTutor = true;
       updatedReview.tutorSignatureDate = now;
       
-      // If the review was scheduled and is now being signed by the tutor, update the status to completed
+      // If the review was scheduled and is now being signed by the tutor/admin/iqa, update the status to completed
       if (updatedReview.status === 'scheduled' && !updatedReview.actualDate) {
         updatedReview.status = 'completed';
         updatedReview.actualDate = now;
@@ -1187,8 +1422,5 @@ export class MemStorage implements IStorage {
 // Import DatabaseStorage implementation
 import { DatabaseStorage } from './database-storage';
 
-// Uncomment this line to use PostgreSQL database instead of in-memory storage
-// export const storage = new DatabaseStorage();
-
-// For now, use MemStorage for development until we've migrated fully
-export const storage = new MemStorage();
+// Using PostgreSQL database storage for persistent data and session handling
+export const storage = new DatabaseStorage();
