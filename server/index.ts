@@ -5,6 +5,14 @@ import { seedDatabase } from "./seed";
 import fileUpload from "express-fileupload";
 import path from "path";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import cors from "cors";
+
+// CORS middleware setup
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true
+}));
+
 
 const app = express();
 // Must be set before rate limiters!
