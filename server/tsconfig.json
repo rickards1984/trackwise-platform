@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2021",
-    "module": "commonjs",
-    "rootDir": "./",
-    "outDir": "dist",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "rootDir": "./src",
+    "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,6 +15,6 @@
       "@shared/*": ["../shared/*"]
     }
   },
-  "include": ["**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
