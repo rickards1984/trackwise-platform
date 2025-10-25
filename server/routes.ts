@@ -60,11 +60,13 @@ const requireRole = (roles: string[]) => {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup session middleware with PostgreSQL
+  const isProduction = process.env.NODE_ENV === 'production';
   app.use(session({
     cookie: { 
       maxAge: 86400000, // 24 hours
-      secure: false, // Set to false for development to work in HTTP
-      sameSite: 'lax'
+      secure: isProduction, // Use secure cookies in production
+      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-origin in production
+      httpOnly: true // Prevent XSS attacks
     },
     store: new PgSession({
       conString: process.env.DATABASE_URL,
