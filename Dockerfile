@@ -1,23 +1,31 @@
-FROM node:18-alpine
-
+# Builder stage
+FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Copy package files
+# Copy manifests for caching
+COPY package*.json ./
+COPY package-lock.json ./
 COPY server/package*.json ./server/
-COPY shared/ ./shared/
 
-# Install dependencies
+# Copy workspace sources
+COPY . .
+
+# Build server
 WORKDIR /app/server
-RUN npm ci --only=production
-
-# Copy built server code
-COPY server/ ./
-
-# Build the application
+RUN npm ci
 RUN npm run build
 
-# Expose port
-EXPOSE ${PORT:-5000}
+# Production stage
+FROM node:18-alpine AS runner
+WORKDIR /app
 
-# Start the application
+# Copy built server artifacts and package manifest
+COPY --from=builder /app/server/dist ./server/dist
+COPY server/package*.json ./server/
+
+WORKDIR /app/server
+# Install production deps only
+RUN npm ci --only=production
+
+EXPOSE 5000
 CMD ["npm", "start"]

@@ -1,16 +1,19 @@
-# Ignore backend code for Vercel deploy
-server/
-db/
-drizzle/
-migrations/
-scripts/
-types/
+# Keep manifests and server/client source files available for Vercel build.
+# Ignore local node_modules and build artifacts but NOT package.json or server code.
+
+**/node_modules
+node_modules
+*.log
 .env
-.eslintrc.cjs
-vite.config.server.ts
-tsconfig.server.json
-tsconfig.json
-.vscode/
-README.md
-package.json
-tsup.config.ts
+.env.local
+.env.*.local
+**/dist
+**/build
+**/.next
+.DS_Store
+.vscode
+/.git
+/.github
+coverage
+tmp
+.idea

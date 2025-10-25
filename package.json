@@ -1,8 +1,14 @@
 {
   "name": "trackwise-root",
   "private": true,
-  "workspaces": ["client", "server"],
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
-    "build": "echo \"root has no build step\""
+    "build": "npm --workspace=server run build",
+    "build:all": "npm --workspaces run build",
+    "start:server": "npm --workspace=server start",
+    "postinstall": "node -e \"console.log('Root postinstall: ensure workspace dependencies are installed as needed')\""
   }
 }
