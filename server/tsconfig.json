@@ -13,8 +13,8 @@
     "paths": {
       "@shared/*": ["../shared/*"]
     },
-    "rootDirs": ["src", "../shared"]        // <— tells TS both folders form one “virtual” root
+    "rootDirs": [".", "../shared"]
   },
-  "include": ["src/**/*", "../shared/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["./**/*.ts", "../shared/**/*"],
+  "exclude": ["node_modules", "dist", "src"]
 }
