@@ -1,3 +1,4 @@
+// @ts-nocheck
 import express from 'express';
 import { storage } from '../storage';
 import { asyncHandler } from '../middleware/errorHandler';

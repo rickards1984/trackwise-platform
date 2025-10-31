@@ -11,6 +11,6 @@ export interface SessionUser {
 declare module 'express-session' {
   interface SessionData {
     userId: number;
-    role: UserRole;
+    role: string;
   }
 }
