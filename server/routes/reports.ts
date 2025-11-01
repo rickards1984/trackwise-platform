@@ -204,7 +204,7 @@ router.get('/otj-activity-types', validate(dateRangeSchema), asyncHandler(async 
   // Format for chart display
   const activityTypeData = Object.entries(activityTypes).map(([type, hours]) => ({
     type,
-    hours,
+    hours: hours as number,
   }));
   
   // Calculate summary statistics
