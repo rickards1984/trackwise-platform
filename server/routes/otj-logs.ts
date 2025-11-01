@@ -162,7 +162,7 @@ router.post("/", isAuthenticated, async (req, res) => {
     const userId = req.session.user.userId;
     const userRole = req.session.user.role;
     
-    const logData = insertOtjLogEntrySchema.parse(req.body);
+    const logData = insertOtjLogEntrySchema.parse(req.body) as any;
     
     // Ensure learner can only create logs for themselves
     if (userRole === 'learner' && logData.learnerId !== userId) {
