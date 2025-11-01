@@ -22,13 +22,9 @@
     "../client/**",
     "../vite.config.ts",
     "**/*vite*.ts",
-    "**/vite.ts",
     "**/*storage*.ts",
-    "**/storage.ts",
     "**/*database-storage*.ts",
-    "**/database-storage.ts",
     "**/*standalone*.ts",
-    "**/standalone.ts",
     "**/*.spec.ts",
     "**/*.test.ts"
   ]
