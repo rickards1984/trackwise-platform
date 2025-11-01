@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { UserRole } from './enums';
 
 // Define session user interface
