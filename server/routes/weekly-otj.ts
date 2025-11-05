@@ -216,7 +216,7 @@ router.post("/", requireAuth, async (req, res) => {
       });
     }
 
-    const weeklyTrackingData = validationResult.data;
+    const weeklyTrackingData = validationResult.data as any;
     
     // Check if the user is creating a record for themselves or has proper permissions
     const currentUserId = req.session.user?.userId;
@@ -278,7 +278,7 @@ router.put("/:id", requireAuth, async (req, res) => {
       });
     }
 
-    const updateData = validationResult.data;
+    const updateData = validationResult.data as any;
     
     // Calculate if the minimum hours requirement is met (if hours are being updated)
     let metRequirement = existingTracking.metRequirement;
