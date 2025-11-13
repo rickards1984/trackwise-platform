@@ -1,10 +1,7 @@
-// @ts-nocheck
-import express, { type Express } from "express";
+import express from "express";
 import fs from "fs";
 import path from "path";
-import { type InlineConfig } from "vite";
 import { createServer } from "vite";
-import { type Server } from "http";
 import viteConfig from "../vite.config.js";
 import { nanoid } from "nanoid";
 
@@ -18,7 +15,7 @@ const viteLogger = {
   warnOnce: console.warn
 };
 
-export function log(message: string, source = "express") {
+export function log(message, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -29,7 +26,7 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-export async function setupVite(app: Express, server: Server) {
+export async function setupVite(app, server) {
   if (process.env.NODE_ENV === 'production') {
     // In production, serve pre-built files
     return;
@@ -82,8 +79,8 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
-export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+export function serveStatic(app) {
+  const distPath = path.resolve(import.meta.dirname, "..", "client", "dist");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(

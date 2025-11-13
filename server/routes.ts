@@ -59,23 +59,43 @@ const requireRole = (roles: string[]) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup session middleware with PostgreSQL
-  app.use(session({
+  // Enforce session secret in production
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && !process.env.SESSION_SECRET) {
+    throw new Error('SESSION_SECRET environment variable is required for production');
+  }
+  
+  const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-change-in-production';
+  if (!process.env.SESSION_SECRET) {
+    console.warn('⚠️  Using default session secret. Set SESSION_SECRET for production!');
+  }
+
+  // Setup session middleware - use PostgreSQL if DATABASE_URL provided, otherwise in-memory
+  const sessionConfig: session.SessionOptions = {
     cookie: { 
       maxAge: 86400000, // 24 hours
       secure: false, // Set to false for development to work in HTTP
       sameSite: 'lax'
     },
-    store: new PgSession({
+    resave: false,
+    saveUninitialized: false,
+    secret: sessionSecret
+  };
+
+  // Add PostgreSQL session store if DATABASE_URL is provided
+  if (process.env.DATABASE_URL) {
+    sessionConfig.store = new PgSession({
       conString: process.env.DATABASE_URL,
       tableName: 'sessions',
       createTableIfMissing: true,
       pruneSessionInterval: 60 * 60 // Prune expired sessions every hour
-    }),
-    resave: false,
-    saveUninitialized: false,
-    secret: process.env.SESSION_SECRET || "skilltrack-session-secret"
-  }));
+    });
+    console.log('✓ Using PostgreSQL session store');
+  } else {
+    console.log('⚠️  Using in-memory session store (sessions lost on restart)');
+  }
+
+  app.use(session(sessionConfig));
 
   // Register API Routes - Use only one route registration
   app.use('/api/auth', authRouter);

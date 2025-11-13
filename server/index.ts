@@ -5,9 +5,31 @@ import fileUpload from "express-fileupload";
 import path from "path";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import cors from "cors";
+import fs from "fs";
 
 function log(message: string) {
-  console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
+  const formattedTime = new Date().toLocaleTimeString();
+  console.log(`[${formattedTime}] ${message}`);
+}
+
+// Serve static files in production
+function serveStatic(app: express.Express) {
+  const distPath = path.resolve(import.meta.dirname, "..", "client", "dist");
+  
+  if (fs.existsSync(distPath)) {
+    log(`Serving static files from ${distPath}`);
+    app.use(express.static(distPath));
+    
+    // Serve index.html for all non-API routes (SPA fallback)
+    app.use("*", (req, res, next) => {
+      if (req.originalUrl.startsWith('/api')) {
+        return next();
+      }
+      res.sendFile(path.resolve(distPath, "index.html"));
+    });
+  } else {
+    log(`Warning: Static build directory not found at ${distPath}`);
+  }
 }
 
 const app = express(); // ✅ Only define once!
@@ -68,12 +90,17 @@ app.use((req, res, next) => {
   app.use('/api/*', notFoundHandler);
   app.use(errorHandler);
 
+  // Serve static frontend files
+  serveStatic(app);
+
   const port = 5000;
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    console.log(`Backend API server running on port ${port}`);
+    log(`✓ TrackWise server running on port ${port}`);
+    log(`✓ API endpoints available at http://localhost:${port}/api`);
+    log(`✓ Frontend application ready`);
   });
 })();

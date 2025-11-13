@@ -1423,5 +1423,22 @@ export class MemStorage implements IStorage {
 // Import DatabaseStorage implementation
 import { DatabaseStorage } from './database-storage';
 
-// Using PostgreSQL database storage for persistent data and session handling
-export const storage = new DatabaseStorage();
+// Storage provider configuration
+// Use STORAGE_BACKEND environment variable to switch between implementations
+// - "memory" (default): In-memory storage for testing - fast, ephemeral, single-tenant
+// - "database": PostgreSQL storage - persistent, multi-tenant ready (when fully implemented)
+const STORAGE_BACKEND = process.env.STORAGE_BACKEND || 'memory';
+
+function createStorage(): IStorage {
+  if (STORAGE_BACKEND === 'database') {
+    console.error('❌ DatabaseStorage is incomplete and will cause errors!');
+    console.error('   Please use STORAGE_BACKEND=memory until DatabaseStorage is fully implemented.');
+    console.error('   Falling back to MemStorage for safety.');
+    return new MemStorage();
+  }
+  
+  console.log('✓ Using MemStorage (In-Memory) - Fully functional for testing, data lost on restart');
+  return new MemStorage();
+}
+
+export const storage = createStorage();
