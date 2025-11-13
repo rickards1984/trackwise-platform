@@ -1,11 +1,14 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
 import fileUpload from "express-fileupload";
 import path from "path";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import cors from "cors";
+
+function log(message: string) {
+  console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
+}
 
 const app = express(); // ✅ Only define once!
 
@@ -44,11 +47,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  try {
-    await seedDatabase();
-    log('Database seeding completed');
-  } catch (error) {
-    log('Error seeding database:', error);
+  if (process.env.ENABLE_DB_SEED === 'true') {
+    try {
+      await seedDatabase();
+      log('Database seeding completed');
+    } catch (error) {
+      log('Error seeding database:', error);
+    }
   }
 
   const server = await registerRoutes(app);
@@ -63,18 +68,12 @@ app.use((req, res, next) => {
   app.use('/api/*', notFoundHandler);
   app.use(errorHandler);
 
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
   const port = 5000;
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    console.log(`Backend API server running on port ${port}`);
   });
 })();

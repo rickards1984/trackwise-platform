@@ -2,8 +2,8 @@ import OpenAI from "openai";
 import { storage } from "./storage";
 import { KsbElement } from "@shared/schema";
 
-// Initialize OpenAI client
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Initialize OpenAI client only if API key is provided
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 // Input interface for AI assistant
 interface AiAssistantInput {
@@ -28,6 +28,12 @@ interface AiAssistantResponse {
 
 // Handle a message from the user and generate an AI response
 export async function handleUserMessage(input: AiAssistantInput): Promise<AiAssistantResponse> {
+  if (!openai) {
+    return {
+      text: "AI Assistant is currently unavailable. Please contact your administrator to configure the OPENAI_API_KEY."
+    };
+  }
+
   try {
     // Sanitize user message to prevent prompt injection
     const cleanMessage = input.message.replace(/[\r\n]+/g, " ");
