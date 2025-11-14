@@ -38,6 +38,15 @@ declare module 'express-session' {
   interface SessionData {
     userId: number;
     role: string;
+    user?: {
+      id: number;
+      userId: number;
+      role: string;
+      username: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+    };
   }
 }
 
@@ -186,12 +195,21 @@ router.post('/login', authRateLimiter, async (req, res) => {
       lastLoginAt: new Date()
     });
 
-    // Set session data
+    // Set session data (using both formats for compatibility)
     req.session.userId = user.id;
     req.session.role = user.role;
+    req.session.user = {
+      id: user.id,
+      userId: user.id,
+      role: user.role,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email
+    };
 
     // Return user data (excluding password)
-    const { password: _, ...userData } = user;
+    const { password: _, ...userData} = user;
     
     res.json({
       message: 'Login successful',
@@ -241,9 +259,18 @@ router.post('/mock-login', async (req, res) => {
       return res.status(404).json({ message: 'Demo user not found' });
     }
     
-    // Set session data
+    // Set session data (using both formats for compatibility)
     req.session.userId = user.id;
     req.session.role = user.role;
+    req.session.user = {
+      id: user.id,
+      userId: user.id,
+      role: user.role,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email
+    };
     
     // Return user data (excluding password)
     const { password: _, ...userData } = user;
