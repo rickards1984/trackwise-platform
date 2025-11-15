@@ -10,24 +10,25 @@ TrackWise is a full-stack SaaS apprenticeship management platform for tracking o
 - Storage: Supabase (file uploads)
 - AI: OpenAI (optional assistant features)
 
-**Current Status:** ✅ **Ready for Testing** - Backend fully functional, frontend builds and loads (requires Supabase credentials for full functionality)
+**Current Status:** ✅ **Ready for Use** - Authentication working, backend functional, frontend ready (add Supabase/OpenAI credentials for full features)
 
 ---
 
 ## Quick Start Guide
 
-### Prerequisites
-✅ Already Configured:
-- `DATABASE_URL` - PostgreSQL connection
-- `SESSION_SECRET` - Session encryption key
+### Prerequisites - Environment Variables
 
-⚠️ **Required for Full Functionality:**
+**Required:**
+- `DATABASE_URL` - PostgreSQL connection string (Neon or other PostgreSQL provider)
+- `SESSION_SECRET` - Secret key for session encryption (generate a random string)
+
+**Required for File Uploads:**
 - `VITE_SUPABASE_URL` - Your Supabase project URL
 - `VITE_SUPABASE_ANON_KEY` - Your Supabase anonymous key
 
-📝 **Optional:**
+**Optional:**
 - `OPENAI_API_KEY` - Enables AI assistant features
-- `ENABLE_DB_SEED` - Set to "true" to enable database seeding
+- `ENABLE_DB_SEED` - Set to "true" to enable database seeding on startup
 
 ### Running the Platform
 
@@ -117,17 +118,41 @@ Both work seamlessly - system auto-detects and logs which is active.
 
 ---
 
+## Recent Fixes (November 15, 2025)
+
+### ✅ Authentication System Repaired
+**Issue:** Session data mismatch between login route and protected endpoints  
+**Fix:** Updated login route to set `req.session.user` with proper structure including both `id` and `userId` fields  
+**Impact:** All protected endpoints (OTJ logs, evidence, reviews, etc.) now accessible after login
+
+### ✅ TypeScript Support for Supabase
+**Issue:** Frontend TypeScript errors for Vite environment variables  
+**Fix:** Created `client/src/vite-env.d.ts` with proper type definitions  
+**Impact:** No more TypeScript errors, better IDE support for Supabase integration
+
+### ✅ Weekly Tracking Authorization
+**Issue:** Mixed user IDs and profile IDs causing authorization failures  
+**Fix:** Properly separated learner USER ID (for authorization) from learner PROFILE ID (for storage queries)  
+**Impact:** Weekly tracking endpoint now works correctly for all user roles
+
+### ✅ Code Quality Improvements
+**Fix:** Corrected TypeScript errors in server logging and storage method calls  
+**Impact:** Cleaner codebase, better type safety
+
+---
+
 ## Current Known Issues & Solutions
 
-### 1. Frontend Shows White Screen
-**Cause:** Missing Supabase credentials (removed for security)
-**Fix:** Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` environment variables
-**Impact:** File upload features won't work until provided
+### 1. MemStorage Limitations (Expected)
+**Status:** Working as designed for testing
+**Details:** Some storage methods not implemented (e.g., deleteOtjLogEntry, getLearnerProfilesByTutorId)
+**Impact:** Minimal - these are documented as incomplete in MemStorage
+**Future:** Will be implemented in DatabaseStorage for production
 
-### 2. AI Assistant Disabled
-**Cause:** No OPENAI_API_KEY provided
-**Fix:** Add OPENAI_API_KEY environment variable (optional)
-**Impact:** AI features gracefully disabled, rest of app works fine
+### 2. AI Assistant (Optional)
+**Status:** Requires OPENAI_API_KEY environment variable
+**Setup:** Add your OpenAI API key as an environment secret
+**Impact:** AI assistant features will be enabled once key is provided
 
 ### 3. Data Lost on Restart
 **Cause:** Using MemStorage (in-memory)
@@ -170,13 +195,13 @@ Your goal: Multiple training providers using the platform with their own credent
 
 ## Environment Variables Reference
 
-### Required for Production
-- `SESSION_SECRET` - ✅ Configured (session encryption)
-- `DATABASE_URL` - ✅ Configured (PostgreSQL connection)
+### Required Core Variables
+- `SESSION_SECRET` - Session encryption key (must be set)
+- `DATABASE_URL` - PostgreSQL connection string (must be set)
 
-### Required for Full Functionality
-- `VITE_SUPABASE_URL` - ⚠️ Missing (file uploads)
-- `VITE_SUPABASE_ANON_KEY` - ⚠️ Missing (file uploads)
+### Required for File Upload Features
+- `VITE_SUPABASE_URL` - Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Your Supabase anonymous key
 
 ### Optional Features
 - `OPENAI_API_KEY` - AI assistant features
@@ -205,9 +230,19 @@ Your goal: Multiple training providers using the platform with their own credent
 
 ---
 
-## Recent Changes (November 13, 2025)
+## Change History
 
-### Completed Migration Tasks
+### November 15, 2025 - Authentication & Bug Fixes
+1. ✅ Fixed critical session data mismatch bug
+2. ✅ Added TypeScript support for Supabase environment variables
+3. ✅ Fixed weekly tracking route authorization logic (USER ID vs PROFILE ID)
+4. ✅ Fixed TypeScript errors across backend (logging, imports)
+5. ✅ Tested and verified authentication flow
+6. ✅ Frontend now properly typed for Vite environment variables
+
+**Note:** Supabase and OpenAI credentials must be added via environment variables for full functionality
+
+### November 13, 2025 - Initial Migration
 1. ✅ Backend API running on port 5000
 2. ✅ Frontend built and served from Express
 3. ✅ Storage factory pattern (MemStorage/DatabaseStorage)
@@ -216,10 +251,10 @@ Your goal: Multiple training providers using the platform with their own credent
 6. ✅ Development defaults with production enforcement
 
 ### Next Steps
-1. Provide Supabase credentials to enable file uploads
-2. Test full user registration → login → OTJ logging flow
-3. Begin DatabaseStorage implementation for persistence
-4. Plan multi-tenancy architecture
+1. Test full user workflows through frontend UI
+2. Begin DatabaseStorage implementation for persistence
+3. Plan multi-tenancy architecture
+4. Implement production deployment configuration
 
 ---
 
