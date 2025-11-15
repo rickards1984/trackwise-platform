@@ -74,7 +74,7 @@ app.use((req, res, next) => {
       await seedDatabase();
       log('Database seeding completed');
     } catch (error) {
-      log('Error seeding database:', error);
+      log('Error seeding database: ' + error);
     }
   }
 
@@ -84,7 +84,7 @@ app.use((req, res, next) => {
     const { registerReportsRoutes } = await import('./routes/reports');
     registerReportsRoutes(app);
   } catch (error) {
-    log('Error registering report routes:', error);
+    log('Error registering report routes: ' + error);
   }
 
   app.use('/api/*', notFoundHandler);

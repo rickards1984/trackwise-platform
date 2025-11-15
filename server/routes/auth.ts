@@ -7,6 +7,7 @@ import { authRateLimiter } from '../middleware/rateLimiter';
 import { generateVerificationToken, sendVerificationEmail } from '../services/email';
 import { db } from '../db';
 import type { Session } from 'express-session';
+import { UserRole } from '@shared/enums';
 
 const router = express.Router();
 
@@ -201,7 +202,7 @@ router.post('/login', authRateLimiter, async (req, res) => {
     req.session.user = {
       id: user.id,
       userId: user.id,
-      role: user.role,
+      role: user.role as UserRole,
       username: user.username,
       firstName: user.firstName,
       lastName: user.lastName,
@@ -265,7 +266,7 @@ router.post('/mock-login', async (req, res) => {
     req.session.user = {
       id: user.id,
       userId: user.id,
-      role: user.role,
+      role: user.role as UserRole,
       username: user.username,
       firstName: user.firstName,
       lastName: user.lastName,

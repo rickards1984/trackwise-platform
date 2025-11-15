@@ -114,28 +114,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limit = parseInt(req.query.limit as string) || 10;
       const offset = (page - 1) * limit;
       
-      // Get learner profile to determine learner ID
-      let learnerId = userId;
+      // Get learner profile to determine learner profile ID for storage queries
+      let learnerProfileId: number;
       
       if (req.session.role !== 'learner') {
-        // For non-learners, they need to specify a learner ID
-        if (req.query.learnerId) {
-          learnerId = parseInt(req.query.learnerId as string);
-          
-          // Check if this user has permission to view this learner
-          const canAccess = await canAccessLearnerProfile(req.session.userId!, req.session.role, learnerId);
-          if (!canAccess) {
-            return res.status(403).json({ message: "You don't have permission to view this learner's data" });
-          }
-        } else {
+        // For non-learners, they need to specify a learner USER ID
+        if (!req.query.learnerId) {
           return res.status(400).json({ message: "learnerId is required for non-learner users" });
         }
-      } else {
-        // For learners, get their profile
-        const profile = await storage.getLearnerProfileByUserId(userId);
-        if (profile) {
-          learnerId = profile.learnerId || userId;
+        
+        const learnerUserId = parseInt(req.query.learnerId as string);
+        
+        // Check if this user has permission to view this learner (uses USER ID)
+        const canAccess = await canAccessLearnerProfile(req.session.userId!, req.session.role, learnerUserId);
+        if (!canAccess) {
+          return res.status(403).json({ message: "You don't have permission to view this learner's data" });
         }
+        
+        // Fetch the learner profile to get the profile ID for storage queries
+        const profile = await storage.getLearnerProfileByUserId(learnerUserId);
+        if (!profile) {
+          return res.status(404).json({ message: "Learner profile not found" });
+        }
+        learnerProfileId = profile.id;
+      } else {
+        // For learners, get their profile using their own user ID
+        const profile = await storage.getLearnerProfileByUserId(userId);
+        if (!profile) {
+          return res.status(404).json({ message: "Learner profile not found" });
+        }
+        learnerProfileId = profile.id;
       }
       
       // Date range filtering - default to last 2 years if not specified
@@ -169,20 +177,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? (req.query.status as string).split(',') 
         : null;
         
-      // Get total count for pagination
-      const totalTracking = await storage.getWeeklyTrackingCountByLearnerId(
-        learnerId, 
+      // Get total count for pagination (using profile ID)
+      const totalTracking = await storage.countWeeklyOtjTrackingsByLearnerId(
+        learnerProfileId, 
         startDate, 
-        endDate, 
-        statusFilter
+        endDate
       );
       
-      // Get weekly tracking entries with pagination
-      const weeklyTracking = await storage.getWeeklyTrackingByLearnerId(
-        learnerId, 
+      // Get weekly tracking entries with pagination (using profile ID)
+      const weeklyTracking = await storage.getWeeklyOtjTrackingsByLearnerId(
+        learnerProfileId, 
         startDate, 
-        endDate, 
-        statusFilter,
+        endDate,
         limit,
         offset
       );
