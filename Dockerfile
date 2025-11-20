@@ -1,40 +1,58 @@
-# Multi-stage build for Node.js TypeScript application
-FROM node:18-alpine AS builder
-
+# Stage 1: Build the Client (Frontend)
+FROM node:18-alpine AS client-builder
 WORKDIR /app
 
-# Copy package files for all workspaces
+# Copy client package files and install dependencies
+COPY client/package*.json ./client/
+# Copy the root package-lock to ensure consistent dependencies
+COPY package-lock.json ./
+WORKDIR /app/client
+RUN npm ci
+
+# Copy client source code and build
+WORKDIR /app
+COPY client/ ./client/
+RUN npm run build -w trackwise-client
+
+# Stage 2: Build the Server (Backend)
+FROM node:18-alpine AS server-builder
+WORKDIR /app
+
+# Copy all package files and install dependencies for the server
 COPY package*.json ./
 COPY server/package*.json ./server/
 COPY shared/ ./shared/
-
-# Install ALL dependencies (including devDependencies for build)
 WORKDIR /app/server
 RUN npm ci
 
-# Copy source code
+# Copy server source code and build
 COPY server/ ./
-
-# Build the application
+# Also copy shared code as it's a dependency for the build
+COPY shared/ ../shared/
 RUN npm run build
 
-# Production stage
+# Stage 3: Final Production Image
 FROM node:18-alpine
-
 WORKDIR /app
 
-# Copy package files
-COPY server/package*.json ./
+# Set NODE_ENV to production
+ENV NODE_ENV=production
 
-# Install ONLY production dependencies
+# Copy server's production dependencies' manifest
+COPY server/package*.json ./
+# Install only production dependencies
 RUN npm ci --only=production
 
-# Copy built artifacts from builder
-COPY --from=builder /app/server/dist ./dist
-COPY --from=builder /app/shared ../shared
+# Copy built artifacts from the previous stages
+# Copy the built server code
+COPY --from=server-builder /app/server/dist ./dist
+# Copy the shared code
+COPY --from=server-builder /app/shared ./shared
+# Copy the built client code into a 'public' folder for the server to use
+COPY --from=client-builder /app/client/dist ./dist/public
 
-# Expose port
+# Expose the port the app will run on
 EXPOSE ${PORT:-5000}
 
-# Start the application
-CMD ["npm", "start"]
+# Command to start the server
+CMD [ "npm", "start" ]

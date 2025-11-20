@@ -14,21 +14,22 @@ function log(message: string) {
 
 // Serve static files in production
 function serveStatic(app: express.Express) {
-  const distPath = path.resolve(import.meta.dirname, "..", "client", "dist");
+  // Serve the static files from the 'public' directory where the client is built
+  const publicPath = path.join(__dirname, "public");
   
-  if (fs.existsSync(distPath)) {
-    log(`Serving static files from ${distPath}`);
-    app.use(express.static(distPath));
+  if (fs.existsSync(publicPath)) {
+    log(`Serving static files from ${publicPath}`);
+    app.use(express.static(publicPath));
     
-    // Serve index.html for all non-API routes (SPA fallback)
+    // For any other request, serve the index.html file so the client-side router can take over
     app.use("*", (req, res, next) => {
       if (req.originalUrl.startsWith('/api')) {
         return next();
       }
-      res.sendFile(path.resolve(distPath, "index.html"));
+      res.sendFile(path.join(publicPath, "index.html"));
     });
   } else {
-    log(`Warning: Static build directory not found at ${distPath}`);
+    log(`Warning: Static build directory not found at ${publicPath}`);
   }
 }
 
